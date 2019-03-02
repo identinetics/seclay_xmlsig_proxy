@@ -16,9 +16,10 @@ The "enveloped SAML EntityDescriptor" provides an implicit signature location.
 
 ## Flow
 
-See sequence_diagram.png
+See doc/sequence_diagram.png
 
-The external web app provides following arguments:
+The interface (for an external web app) is implemented as a HTTP GET request 
+and provides following arguments:
 
 * unsigned XML
 * Signature type (enveloping, samled)
@@ -26,13 +27,12 @@ The external web app provides following arguments:
 * return (path to finally redirect the browser at the external web app)
 
 
-
 ## Test setup:
 
-1. start client_service.py
+1. start sig_proxy.py
 2. start signature_service.py
-3. Redirect the browser to http://localhost:8080/
-
+3. start the external webapp (proxy or real) 
+4. Trigger the folw at the external webapp
 
 
 ## Deployment
