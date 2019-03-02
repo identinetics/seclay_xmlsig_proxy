@@ -1,0 +1,66 @@
+window.onload = get_signature;
+
+function get_signature () {
+    function get_unsigned_xml(url) {
+        var xmlHttp = new XMLHttpRequest();
+        xmlHttp.open("GET", url, false); // false for synchronous request
+        xmlHttp.timeout = 5000;
+        xmlHttp.send(null);
+        return xmlHttp.responseText;
+    }
+
+    function security_layer_request(unsignedxml) {
+        var http = new XMLHttpRequest();
+        http.onreadystatechange = handle_sig_response;
+        var url = '${sigserviceconfig_url}';
+        var params = 'XMLRequest=' + unsignedxml;
+        http.open('POST', url, true);
+        //http.timeout = 5000;  // timeout not viable because of user interaction
+        http.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+        http.send(params);
+    }
+
+    function handle_sig_response() {
+        if(http.readyState == 4) {
+            switch (http.status) {
+                case 200:
+                    if (http.responseText === undefined || http.responseText === '') {
+                        submit_to_client('<error code=2 msg="There is no result to signature service on ${sigserviceconfig_url}"/>');
+                    } else {
+                        document.getElementsByName('XMLRequest')[0].value = http.responseText;
+                        submit_to_client(http.responseText);
+                    }
+                    break;
+                case 0:
+                    submit_to_client('<error code=1 msg="could not connect to signature service on ${sigserviceconfig_url}"/>');
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+
+    var unsignedxml = get_unsigned_xml(${unsignedxml_url})
+    security_layer_request(unsignedxml)
+
+}
+
+function submit_to_client(params) {
+    function handle_client_response() {
+        if (http.readyState == 4) {
+            if (http.status != 200) {
+                alert('Failed to answer signature creation request to ');
+            } else {
+                document.open();
+                document.write(http.responseText);
+                document.close();
+            }
+        }
+    }
+    var http = new XMLHttpRequest();
+    var url = '${getsignedxmldoc_path}';
+    http.open('POST', url, true);
+    http.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+    http.onreadystatechange = handle_client_response;
+    http.send(params);
+}
