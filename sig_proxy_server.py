@@ -74,7 +74,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         return js
 
     def _sanitize(self, query_part: str) -> dict:
-        mandatoryparams = {'result_to', 'return', 'sigtype', 'unsignedxml_url', }
+        mandatoryparams = set(self.cfg.mandatoryparamtypes.keys())
         urlparams = dict(urllib.parse.parse_qsl(query_part))
         if 'sigtype' not in urlparams:
             urlparams['sigtype'] = self.cfg.SIGTYPE_SAMLED
@@ -85,11 +85,20 @@ class RequestHandler(BaseHTTPRequestHandler):
         urlparams_sane = {}
         valid_chars = "-_.+/%s%s" % (string.ascii_letters, string.digits)   # restrictive charset
         for k,v1 in urlparams.items():
+            if self.cfg.mandatoryparamtypes[k] == 'url':
+                if not self.is_allowed_host(k, v1):
+                    raise InvalidArgs(f"URL parameter {k} is not an allowed_host: {v1}")
             v2 = unicodedata.normalize('NFKD', v1)
             v3 = v2.encode('ascii', 'ignore').decode('ascii')
             v4 = ''.join(c for c in v3 if c in valid_chars)
             urlparams_sane[k] = v4
         return urlparams_sane
+
+    def is_allowed_host(self, param_name, param_value):
+        for allowed_url in self.cfg.allowed_client_urls[param_name]:
+            if param_value.startswith(allowed_url):
+                return True
+        return False
 
     def do_POST(self):
         logging.info(f"POST {self.path}")

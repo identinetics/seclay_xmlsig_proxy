@@ -4,63 +4,60 @@ function do_signature_flow () {
     const ASYNC_FALSE = false;
 
     function get_unsigned_xml(url) {
-        writetostatus('reading unsigned XMl document')
+        writetostatus("reading unsigned XMl document");
         var xmlHttp = new XMLHttpRequest();
         xmlHttp.open("GET", url, ASYNC_FALSE);
-        xmlHttp.timeout = 5000;
         xmlHttp.send(null);
         return xmlHttp.responseText;
     }
 
     function get_creignedxml_requ(url, unsignedxml) {
-        writetostatus('creatingCreateXMLSignatureRequest')
-        var params = 'unsignedxml=' + unsignedxml;
+        writetostatus("creatingCreateXMLSignatureRequest");
+        var params = "unsignedxml=" + unsignedxml;
         var xmlHttp = new XMLHttpRequest();
         xmlHttp.open("POST", url, ASYNC_FALSE);
-        xmlHttp.timeout = 5000;
-        xmlHttp.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+        xmlHttp.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
         xmlHttp.send(params);
         return xmlHttp.responseText;
     }
 
     function security_layer_request(url, cresignedxml_requ) {
-        writetostatus('requesting Signature from Security Layer')
-        var params = 'XMLRequest=' + cresignedxml_requ;
+        writetostatus("requesting Signature from Security Layer");
+        var params = "XMLRequest=" + cresignedxml_requ;
         var xmlHttp = new XMLHttpRequest();
-        xmlHttp.open('POST', url, ASYNC_FALSE);
-        //xmlHttp.timeout = 0;  // timeout not viable because of user interaction
-        xmlHttp.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+        xmlHttp.open("POST", url, ASYNC_FALSE);
+        xmlHttp.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
         xmlHttp.send(params);
     }
 
     function getsignedxmldoc(url, cresignedxml_resp) {
-        writetostatus('extracting signed XML doc from Security Layer respoonse')
-        return cresignedxml_resp
+        writetostatus("extracting signed XML doc from Security Layer respoonse");
+        return cresignedxml_resp;
     }
 
     function post_result_to(url, signedxml) {
-        writetostatus('posting signed XML doc to requesting application')
+        writetostatus("posting signed XML doc to requesting application");
     }
 
      function load_termination_page(termination_page) {
-        writetostatus('Signature Proxy/Browser Client says good bye')
+        writetostatus("Signature Proxy/Browser Client says good bye")
         document.open();
         document.write(termination_page);
         document.close();
     }
 
     function writetostatus(msg){
-        window.status = msg
-        messagelist = messagelist.contat('<li>', msg, '</li>')
-        messagebox.innerHTML('<ul>'.concat(messagelist, '</ul>'));
+        window.status = msg;
+        messagelist = messagelist + "<li>"+ msg + "</li>";
+        // messagebox.innerHTML = "<ul>" + messagelist + "</ul>";
     }
 
-    var messagelist = '';
-    var messagebox = document.getElementByName('messages');
-    var unsignedxml = get_unsigned_xml('${unsignedxml_url}')
-    var cresignedxml_requ = get_creignedxml_requ(unsignedxml)
-    var cresignedxml_resp = security_layer_request('${sigservice_url}', cresignedxml_requ)
-    var signedxml = getsignedxmldoc('${getsignedxmldoc_url}'', cresignedxml_resp)
-    var termination_page = post_result_to('${result_to}', signedxml)
+    var messagelist = "";
+    var messagebox = document.getElementById("messages")[0];
+    var unsignedxml = get_unsigned_xml("${unsignedxml_url}");
+    var cresignedxml_requ = get_creignedxml_requ(unsignedxml);
+    var cresignedxml_resp = security_layer_request("${sigservice_url}", cresignedxml_requ);
+    var signedxml = getsignedxmldoc("${getsignedxmldoc_url}", cresignedxml_resp);
+    var termination_page = post_result_to("${result_to}", signedxml);
     load_termination_page(termination_page)
 }

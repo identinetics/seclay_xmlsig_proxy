@@ -13,6 +13,12 @@ def test_loadsigproxyclient():
     assert response.text.startswith(expected_result_path.read_text())
 
 
+def test_loadsigproxyclient_parameter_value_not_allowed():
+    url = ExtWebappConfig.load_sigproxy_url().replace('=http', '=https')
+    response = requests.get(url)
+    assert response.status_code == 422
+
+
 def test_make_cresigrequ():
     url = cfg.rooturl + cfg.make_cresigrequ_path
     unsignedxml_path = Path('testdata/unsigned_data.xml')

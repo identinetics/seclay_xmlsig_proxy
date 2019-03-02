@@ -16,7 +16,13 @@ class SigProxyConfig:
     SIGTYPE_ENVELOPED = 'enveloped'
     SIGTYPE_VALUES = (SIGTYPE_ENVELOPING, SIGTYPE_SAMLED, )
     rooturl = f"http://{host}:{port}"
-    allowed_client_urls = ['http://localhost:8090/', ]  # TODO implement in sig_proxy.py
+    mandatoryparamtypes = {'result_to': 'url', 'return': 'url', 'sigtype': 'str', 'unsignedxml_url': 'url', }
+    # for each url parameter define a list of strings that must left-match the respective parameter value
+    allowed_client_urls = {
+        'result_to': ['http://localhost:8090/', ],
+        'return': ['http://localhost:8090/', ],
+        'unsignedxml_url': ['http://localhost:8090/', ],
+    }
 
 
 # Signature Service (Security Layer) address

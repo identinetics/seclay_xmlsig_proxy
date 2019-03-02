@@ -27,7 +27,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         self.cfg = ExtWebappConfig
         with self.cfg.test_unsignedxml.open('rb') as fd:
             self.test_unsignedxml = fd.read()
-        with self.cfg.test_expexted_signedxml.open('rb') as fd:
+        with self.cfg.test_expected_signedxml.open('rb') as fd:
             self.expected_signedxml = fd.read()
         super().__init__(*args, **kwargs)
 
