@@ -6,7 +6,7 @@ import sys
 import urllib
 import unicodedata
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from socketserver import ThreadingMixIn
+#from socketserver import ThreadingMixIn
 import enforce
 enforce.config({'enabled': True, 'mode': 'covariant'})
 import config
@@ -16,15 +16,11 @@ from get_seclay_request import get_seclay_request
 def main():
     c = config.SigProxyConfig
     print(f'starting {__file__} at {c.host}:{c.port}')
-    httpd = MultiThreadedHTTPServer((c.host, c.port), RequestHandler)
+    httpd = HTTPServer((c.host, c.port), RequestHandler)
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
         pass
-
-
-class MultiThreadedHTTPServer(ThreadingMixIn, HTTPServer):
-    pass
 
 
 class InvalidArgs(Exception):
@@ -43,32 +39,39 @@ class RequestHandler(BaseHTTPRequestHandler):
             if self.path.startswith(self.cfg.loadsigproxyclient_path):
                 self._loadsigproxyclient()
             else:
-                self.send_response(404, 'no service at this path')
+                self.send_error(404, 'no service at this path')
         except InvalidArgs as e:
-            self.send_response(422, str(e))
+            self.send_error(422, str(e))
         except Exception as e:
-            self.send_response(400, str(e))
+            self.send_error(400, str(e))
 
     def _loadsigproxyclient(self):
-        sigproxyclient_js = self._render_js_template()
+        sigproxyclient_html = self._render_sigproxyclient_html()
         self.send_response(200)
-        self.send_header('Content-type', 'application/javascript')
+        self.send_header('Content-type', 'text/html')
         self.send_header('Cache-Control', 'no-cache')
         self.end_headers()
-        self.wfile.write(sigproxyclient_js)
+        self.wfile.write(sigproxyclient_html)
 
-    def _render_js_template(self):
+    def _render_sigproxyclient_html(self):
+        sigproxyclient_js = self._render_sigproxyclient_js()
+        with self.cfg.sig_proxy_html_template.open('r') as fd:
+            html_template = string.Template(fd.read())
+        html = html_template.substitute({'javascript': sigproxyclient_js})
+        return html.encode('utf-8')
+
+    def _render_sigproxyclient_js(self):
         urlparts = urllib.parse.urlparse(self.path)
         urlparams_sane = self._sanitize(urlparts.query)
         js_params = {
-            'getsignedxmldoc_path': self.cfg.rooturl + self.cfg.getsignedxmldoc_path,
-            'sigserviceconfig_url': config.SigServiceConfig.url,
+            'getsignedxmldoc_url': self.cfg.rooturl + self.cfg.getsignedxmldoc_path,
+            'sigservice_url': config.SigServiceConfig.url,
             **urlparams_sane,
         }
         with self.cfg.sig_proxy_js_template.open('r') as fd:
             js_template = string.Template(fd.read())
         js = js_template.substitute(js_params)
-        return js.encode('utf-8')
+        return js
 
     def _sanitize(self, query_part: str) -> dict:
         mandatoryparams = {'result_to', 'return', 'sigtype', 'unsignedxml_url', }
@@ -97,11 +100,11 @@ class RequestHandler(BaseHTTPRequestHandler):
             elif self.path == self.cfg.getsignedxmldoc_path:
                 self._get_signedxmldoc()
             else:
-                self.send_response(404, 'no POST service at this path')
+                self.send_error(404, 'no POST service at this path')
         except InvalidArgs as e:
-            self.send_response(422, str(e))
+            self.send_error(422, str(e))
         except Exception as e:
-            self.send_response(400, str(e))
+            self.send_error(400, str(e))
 
     def _make_cresigrequ(self):
         sigtype = str(self.post_vars[b'sigtype'][0]) if b'sigtype' in self.post_vars else self.cfg.SIGTYPE_SAMLED

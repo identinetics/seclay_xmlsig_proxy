@@ -4,28 +4,28 @@ title Request Signature via Front Channel (Browser)
 
 Browser->+External\nWebApp: GET <trigger signing flow url>
 External\nWebApp-->-Browser: HTTP 302 \nhttp://sig_proxy_service/SigProxy/load_sigproxyclient\n?xmldoc=<unsignedxml-url>\n&sigtype=<sigtype>\n&result_to=<result-path>\n&return=<return-path>
-note over External\nWebApp, SigProxy
+note over External\nWebApp, SigProxy\nServer
   no state preserved between invocations
 end note
-Browser->+SigProxy: GET /SigProxy/load_sigproxyclient?xmldoc=<unsignedxml-url>\n&sigtype=<sigtype>\n&result_to=<result-path>\n&return=<return-path>
-SigProxy-->-Browser: 200 SigProxyClient(unsignedxml-url, sigtype, sigloc, result-path, return-path)
+Browser->+SigProxy\nServer: GET /SigProxy/load_sigproxyclient?xmldoc=<unsignedxml-url>\n&sigtype=<sigtype>\n&result_to=<result-path>\n&return=<return-path>
+SigProxy\nServer-->-Browser: 200 SigProxyClient(unsignedxml-url, sigtype, sigloc, result-url, return-url)
 Browser->+Browser:  autoload \nSigProxyClient \n(Javascript)
 Browser->+External\nWebApp: GET <unsignedxml-url>
 External\nWebApp-->-Browser: HTTP 200 unsignedXML
-Browser->+SigProxy: POST /SigProxy/make_cresigrequ (unsignedxml)
-SigProxy-->-Browser: HTTP 200 CreateXMLSignatureRequest
+Browser->+SigProxy\nServer: POST /SigProxy/make_cresigrequ (unsignedxml)
+SigProxy\nServer-->-Browser: HTTP 200 CreateXMLSignatureRequest
 note left of SecLayer
 Seclayer running on localhost:3495
 end note
 Browser->+SecLayer: XMLHTTP POST /http-security-layer-request\n(XMLRequest=CreateXMLSignatureRequest)
 SecLayer-->-Browser: HTTP 200 <CreateXMLSignatureResponse>
-Browser->+SigProxy: XMLHTTP-Request POST /SigProxy/getsignedxmldoc\n(sigresponse=CreateXMLSignatureResponse)
-SigProxy-->-Browser: HTTP 200 <signedXML>
+Browser->+SigProxy\nServer: XMLHTTP-Request POST /SigProxy/getsignedxmldoc\n(sigresponse=CreateXMLSignatureResponse)
+SigProxy\nServer-->-Browser: HTTP 200 <signedXML>
 Browser->+External\nWebApp: XMLHTTP-Request POST <result-path>\n(signedxml=<signedXML>)
 External\nWebApp-->-Browser: HTTP 200 OK
 note left of Browser
-terminationpage
-has been loaded
+terminationpage 
+has been loaded 
 with SigProxyClient
 end note
 Browser->-Browser: document.write\n(termination_page)

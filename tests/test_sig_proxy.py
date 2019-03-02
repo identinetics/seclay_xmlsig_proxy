@@ -9,7 +9,8 @@ def test_loadsigproxyclient():
     url = ExtWebappConfig.load_sigproxy_url()
     response = requests.get(url)
     assert response.status_code == 200
-    assert response.text.startswith('window.onload = get_signature;')
+    expected_result_path = Path('testdata/expected_sig_client.html')
+    assert response.text.startswith(expected_result_path.read_text())
 
 
 def test_make_cresigrequ():
