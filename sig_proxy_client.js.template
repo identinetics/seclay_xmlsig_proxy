@@ -18,9 +18,9 @@ function do_signature_flow () {
         return xhr.responseText;
     }
 
-    function get_creignedxml_requ(url, unsignedxml) {
+    function get_cresignedxml_requ(url, unsignedxml, sigtype) {
         write_status("creatingCreateXMLSignatureRequest");
-        var params = "unsignedxml=" + unsignedxml;
+        var params = "sigtype=" + sigtype + "&unsignedxml=" + encodeURI(unsignedxml);
         var xhr = new XMLHttpRequest();
         xhr.open("POST", url, ASYNC_FALSE);
         xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
@@ -34,7 +34,7 @@ function do_signature_flow () {
 
     function security_layer_request(url, cresignedxml_requ) {
         write_status("requesting Signature from Security Layer");
-        var params = "XMLRequest=" + cresignedxml_requ;
+        var params = "XMLRequest=" + encodeURI(cresignedxml_requ);
         var xhr = new XMLHttpRequest();
         xhr.open("POST", url, ASYNC_FALSE);
         xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
@@ -46,7 +46,7 @@ function do_signature_flow () {
 
     function getsignedxmldoc(url, cresignedxml_resp) {
         write_status("extracting signed XML doc from Security Layer response");
-        var params = "sigresponse=" + cresignedxml_resp;
+        var params = "sigresponse=" + encodeURI(cresignedxml_resp);
         var xhr = new XMLHttpRequest();
         xhr.open("POST", url, ASYNC_FALSE);
         xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
@@ -62,7 +62,7 @@ function do_signature_flow () {
 
     function post_result_to(url, signedxml) {
         write_status("posting signed XML doc to requesting application");
-        var params = "signedxml=" + signedxml;
+        var params = "signedxml=" + (signedxml);
         var xhr = new XMLHttpRequest();
         xhr.open("POST", url, ASYNC_FALSE);
         xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
@@ -86,7 +86,7 @@ function do_signature_flow () {
     var messagebox = document.getElementById("messages");
     try {
         var unsignedxml = get_unsigned_xml("${unsignedxml_url}");
-        var cresignedxml_requ = get_creignedxml_requ("${make_cresigrequ_url}", unsignedxml);
+        var cresignedxml_requ = get_cresignedxml_requ("${make_cresigrequ_url}", unsignedxml, "${sigtype}");
         var cresignedxml_resp = security_layer_request("${sigservice_url}", cresignedxml_requ);
         var signedxml_resp = getsignedxmldoc("${getsignedxmldoc_url}", cresignedxml_resp);
         post_result_to("${result_to}", signedxml_resp);

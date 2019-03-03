@@ -76,7 +76,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         urlparams_sane = self._sanitize(urlparts.query)
         js_params = {
             'getsignedxmldoc_url': self.cfg.rooturl + self.cfg.getsignedxmldoc_url,
-            'make_cresigrequ_url': self.cfg.make_cresigrequ_url,
+            'make_cresigrequ_url': self.cfg.rooturl + self.cfg.make_cresigrequ_url,
             'sigservice_url': config.SigServiceConfig.url,
             **urlparams_sane,
         }
@@ -91,7 +91,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         if 'sigtype' not in urlparams:
             urlparams['sigtype'] = self.cfg.SIGTYPE_SAMLED
         if len(set(urlparams.keys()).difference(mandatoryparams)) > 0:
-            raise InvalidArgs(f"URL parameters must be these: {mandatoryparams}")
+            raise InvalidArgs(f"URL parameters must be these: {mandatoryparams}. {set(urlparams.keys()).difference(mandatoryparams)}?")
         if urlparams['sigtype'] not in self.cfg.SIGTYPE_VALUES:
             raise InvalidArgs(f"URL parameters must be on of: {self.cfg.SIGTYPE_VALUES}")
         urlparams_sane = {}
@@ -129,7 +129,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             self.send_error(400, str(e))
 
     def _make_cresigrequ(self):
-        sigtype = str(self.post_vars[b'sigtype'][0]) if b'sigtype' in self.post_vars else self.cfg.SIGTYPE_SAMLED
+        sigtype = self.post_vars[b'sigtype'][0].decode('utf-8') if b'sigtype' in self.post_vars else self.cfg.SIGTYPE_SAMLED
         unsignedxml = self.post_vars[b'unsignedxml'][0]
         #unsignedxml = urllib.parse.unquote(unsignedxml_qt)
         create_xml_signature_request = self._get_CreateXMLSignatureRequest(sigtype, unsignedxml)
