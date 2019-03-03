@@ -41,3 +41,10 @@ The SigProxy server should be deployed with an TLS-terminating proxy.
 It can be proxied into the namespace of the external webapp; the root path can be rewritten, e.g.
 
 http://sigproxy/SigProxy/xxx  -> http://sigproxy/nonappnamespace/xxx
+
+## Security Considerations
+
+The external web application must allow callbacks from the signature proxy by setting an appropriate acces-control-allow-origin header.
+
+The signature proxy must validate the urls in the input args. 
+A whilelist of allowed hosts must be configured in SigProxyConfig.allowed_urls.  

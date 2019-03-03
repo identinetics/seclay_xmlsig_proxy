@@ -1,13 +1,15 @@
 import cgi
-from http.server import BaseHTTPRequestHandler, HTTPServer
 import logging
 import re
 import urllib
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
 import config
 
 def main():
-    print(f'starting server at {config.sig_service_address[config.HOST]}:{config.sig_service_address[config.PORT]}')
-    httpd = HTTPServer(config.sig_service_address, RequestHandler)
+    (host, port) = (config.SigServiceConfig.host, config.SigServiceConfig.port)
+    print(f'starting server at {host}:{port}')
+    httpd = HTTPServer((host, port), RequestHandler)
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
@@ -16,10 +18,10 @@ def main():
 
 class RequestHandler(BaseHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
-        with open('testdata/expected_create_sig_requ.data') as fd:
+        with (Path(__file__).parent / 'testdata/expected_create_sig_requ.xml').open() as fd:
             text = fd.read().rstrip()
             self.expected_create_sig_requ = '\n'.join(text.splitlines())
-        with open('testdata/xmlsig_response.xml') as fd:
+        with (Path(__file__).parent / 'testdata/createxmlsignature_response.xml').open() as fd:
             self.xml_signed = fd.read()
         super().__init__(*args, **kwargs)
 

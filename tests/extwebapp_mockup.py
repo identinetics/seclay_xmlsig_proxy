@@ -1,9 +1,11 @@
 import cgi
-from http.server import BaseHTTPRequestHandler, HTTPServer
 import logging
 import re
 import urllib
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
 from tests.config_extwebapp import ExtWebappConfig
+from config import SigProxyConfig
 
 """ test commands
     curl http://localhost:8090/
@@ -41,14 +43,24 @@ class RequestHandler(BaseHTTPRequestHandler):
         def do_unsignedxml_path():
             self.send_response(200)
             self.send_header('Content-type', 'text/html')
+            self.send_header("Access-Control-Allow-Origin", SigProxyConfig.rooturl)
             self.end_headers()
             self.wfile.write(self.test_unsignedxml)
 
         def do_resultpage():
             self.send_response(200)
-            self.send_header('Content-type', 'text/html')
+            self.send_header('Content-type', 'text/plain')
+            self.send_header("Access-Control-Allow-Origin", SigProxyConfig.rooturl)
             self.end_headers()
-            self.wfile.write(b'complete.')
+            urlparts = urllib.parse.urlparse(self.path)
+            urlparams = dict(urllib.parse.parse_qsl(urlparts.query))
+            if 'code' in urlparams:
+                content = f"SignatureProxy failed. {urlparams['msg']} ({urlparams['code']})".encode('utf-8')
+            else:
+                with Path('/tmp/sig_proxy_tmp.xml').open('rb') as fd:
+                    content = (fd.read() or b'Error: empty XML response')
+            self.wfile.write(content)
+            return
 
         logging.info(f"GET {self.path}")
         if re.match(self.cfg.unsignedxml_path, self.path):
@@ -62,18 +74,22 @@ class RequestHandler(BaseHTTPRequestHandler):
         logging.info(f"POST {self.path}")
         if not re.match(self.cfg.returnsignedxml_path, self.path):
             self.send_response(404, 'no POST service at this path')
+            return
         post_vars = self._parse_postvars()
         signedxml = post_vars[b'signedxml'][0]
         signedxml_lines = re.split(r'\r\n', signedxml.decode('utf-8').rstrip())
-        signedxml_normalized_lineending = '\n'.join(signedxml_lines)
-        if self.expected_signedxml != signedxml_normalized_lineending:
-            logging.error("Signed XML not matching expected data:\n" + signedxml_normalized_lineending[0:200])
+        self.signedxml_normalized_lineending = '\n'.join(signedxml_lines)
+        if self.expected_signedxml != self.signedxml_normalized_lineending:
+            logging.error("Signed XML not matching expected data:\n" + self.signedxml_normalized_lineending[0:200])
 
         self.send_response(200)
         self.send_header('Content-type', 'text/html')
         self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
-        self.wfile.write(self.expected_signedxml)
+        with Path('/tmp/sig_proxy_tmp.xml').open('w') as fd:
+            fd.write(self.signedxml_normalized_lineending)
+        with Path('/tmp/sig_proxy_tmp.xml').open('r') as fd:
+            l = len(fd.read())
 
     def _parse_postvars(self) -> dict:
         ctype, pdict = cgi.parse_header(self.headers['content-type'])

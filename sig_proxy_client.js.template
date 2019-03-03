@@ -1,63 +1,103 @@
 window.onload = do_signature_flow;
+"use strict";
 
 function do_signature_flow () {
     const ASYNC_FALSE = false;
+    const ERR_CLIENT_CALLBACK1 = {name: "clientcallback1", message: "Error when reading unsigned document from client application"}
+    const ERR_CLIENT_CALLBACK2 = {name: "clientcallback2", message: "Error when returning signed document to client application"}
+    const ERR_PROXY_CALLBACK2 = {name: "proxycallback2", message: "Error when requesting signed XML document from signature proxy"}
+    const ERR_SECLAY = {name: "seclay", message: "Error when sending CreateXMLSignatureRequest to Security Layer"}
 
     function get_unsigned_xml(url) {
-        writetostatus("reading unsigned XMl document");
-        var xmlHttp = new XMLHttpRequest();
-        xmlHttp.open("GET", url, ASYNC_FALSE);
-        xmlHttp.send(null);
-        return xmlHttp.responseText;
+        write_status("reading unsigned XML document");
+        var xhr = new XMLHttpRequest();
+        xhr.open("GET", url, ASYNC_FALSE);
+        xhr.send(null);
+        if (xhr.status != 200) throw ERR_CLIENT_CALLBACK1;
+        write_status('Response OK, returned ' +  xhr.responseText.length + ' characters');
+        return xhr.responseText;
     }
 
     function get_creignedxml_requ(url, unsignedxml) {
-        writetostatus("creatingCreateXMLSignatureRequest");
+        write_status("creatingCreateXMLSignatureRequest");
         var params = "unsignedxml=" + unsignedxml;
-        var xmlHttp = new XMLHttpRequest();
-        xmlHttp.open("POST", url, ASYNC_FALSE);
-        xmlHttp.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
-        xmlHttp.send(params);
-        return xmlHttp.responseText;
+        var xhr = new XMLHttpRequest();
+        xhr.open("POST", url, ASYNC_FALSE);
+        xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+        xhr.send(params);
+        if (xhr.status != 200)
+            throw {name: "proxycallback1",
+                   message: "Error when requesting CreateXMLSignatureRequest from signature proxy, http code=" + xhr.status};
+        write_status('Response OK, returned ' +  xhr.responseText.length + ' characters');
+        return xhr.responseText;
     }
 
     function security_layer_request(url, cresignedxml_requ) {
-        writetostatus("requesting Signature from Security Layer");
+        write_status("requesting Signature from Security Layer");
         var params = "XMLRequest=" + cresignedxml_requ;
-        var xmlHttp = new XMLHttpRequest();
-        xmlHttp.open("POST", url, ASYNC_FALSE);
-        xmlHttp.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
-        xmlHttp.send(params);
+        var xhr = new XMLHttpRequest();
+        xhr.open("POST", url, ASYNC_FALSE);
+        xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+        xhr.send(params);
+        if (xhr.status != 200) throw ERR_SECLAY;  // errors reported in content handled later
+        write_status('Response OK, returned ' +  xhr.responseText.length + ' characters');
+        return xhr.responseText;
     }
 
     function getsignedxmldoc(url, cresignedxml_resp) {
-        writetostatus("extracting signed XML doc from Security Layer respoonse");
-        return cresignedxml_resp;
+        write_status("extracting signed XML doc from Security Layer response");
+        var params = "sigresponse=" + cresignedxml_resp;
+        var xhr = new XMLHttpRequest();
+        xhr.open("POST", url, ASYNC_FALSE);
+        xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+        xhr.send(params);
+        if (xhr.status == 204) {
+            sl_error = JSON.parse(xhr.responseText)
+            throw sl_error
+        }
+        if (xhr.status != 200) throw ERR_PROXY_CALLBACK2;
+        write_status('Response OK, returned ' +  xhr.responseText.length + ' characters');
+        return xhr.responseText
     }
 
     function post_result_to(url, signedxml) {
-        writetostatus("posting signed XML doc to requesting application");
+        write_status("posting signed XML doc to requesting application");
+        var params = "signedxml=" + signedxml;
+        var xhr = new XMLHttpRequest();
+        xhr.open("POST", url, ASYNC_FALSE);
+        xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+        xhr.send(params);
+         write_status('Response OK, returned ' +  xhr.responseText.length + ' characters');
+       if (xhr.status != 200) throw ERR_CLIENT_CALLBACK2;
     }
 
-     function load_termination_page(termination_page) {
-        writetostatus("Signature Proxy/Browser Client says good bye")
-        document.open();
-        document.write(termination_page);
-        document.close();
+    function load_termination_page(url) {
+        write_status("Signature Proxy/Browser Client says good bye")
+        document.location = url
     }
 
-    function writetostatus(msg){
-        window.status = msg;
+    function write_status(msg){
+        console.log(msg)
         messagelist = messagelist + "<li>"+ msg + "</li>";
-        // messagebox.innerHTML = "<ul>" + messagelist + "</ul>";
+        messagebox.innerHTML = "<ul>" + messagelist + "</ul>";
     }
 
     var messagelist = "";
-    var messagebox = document.getElementById("messages")[0];
-    var unsignedxml = get_unsigned_xml("${unsignedxml_url}");
-    var cresignedxml_requ = get_creignedxml_requ(unsignedxml);
-    var cresignedxml_resp = security_layer_request("${sigservice_url}", cresignedxml_requ);
-    var signedxml = getsignedxmldoc("${getsignedxmldoc_url}", cresignedxml_resp);
-    var termination_page = post_result_to("${result_to}", signedxml);
-    load_termination_page(termination_page)
+    var messagebox = document.getElementById("messages");
+    try {
+        var unsignedxml = get_unsigned_xml("${unsignedxml_url}");
+        var cresignedxml_requ = get_creignedxml_requ("${make_cresigrequ_url}", unsignedxml);
+        var cresignedxml_resp = security_layer_request("${sigservice_url}", cresignedxml_requ);
+        var signedxml_resp = getsignedxmldoc("${getsignedxmldoc_url}", cresignedxml_resp);
+        post_result_to("${result_to}", signedxml_resp);
+        err_params = ''
+    } catch(err) {
+        if (err.name == 'NetworkError')
+            msg = '(' + err.name + ') ' + err.message + err.sourceURL;
+        else
+            msg = '(' + err.name + ') ' + err.message
+        alert('The signature request could not be completed. \nReason: ' + msg)
+        err_params = '?code=' + encodeURI(err.name) + "&msg=" + encodeURI(err.message)
+    }
+    load_termination_page("${return}" + err_params)
 }

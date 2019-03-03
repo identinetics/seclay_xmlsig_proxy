@@ -1,4 +1,5 @@
 enforce
 flake8
+lxml
 pytest
 requests

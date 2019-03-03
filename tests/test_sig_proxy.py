@@ -20,7 +20,7 @@ def test_loadsigproxyclient_parameter_value_not_allowed():
 
 
 def test_make_cresigrequ():
-    url = cfg.rooturl + cfg.make_cresigrequ_path
+    url = cfg.rooturl + cfg.make_cresigrequ_url
     unsignedxml_path = Path('testdata/unsigned_data.xml')
     postdata = {'unsignedxml': unsignedxml_path.read_text()}
     response = requests.post(url, data=postdata)
@@ -30,7 +30,7 @@ def test_make_cresigrequ():
 
 
 def test_get_signedxmldoc():
-    url = cfg.rooturl + cfg.getsignedxmldoc_path
+    url = cfg.rooturl + cfg.getsignedxmldoc_url
     createxmlsigresp_path = Path('testdata/createxmlsignature_response.xml')
     postdata = {'sigresponse': createxmlsigresp_path.read_text()}
     response = requests.post(url, data=postdata)
