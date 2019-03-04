@@ -3,11 +3,11 @@
 title Request Signature via Front Channel (Browser)
 
 Browser->+External\nWebApp: GET <trigger signing flow url>
-External\nWebApp-->-Browser: HTTP 302 \nhttp://sig_proxy_service/SigProxy/load_sigproxyclient\n?xmldoc=<unsignedxml-url>\n&sigtype=<sigtype>\n&result_to=<result-path>\n&return=<return-path>
+External\nWebApp-->-Browser: HTTP 302 \nhttp://sig_proxy_service/SigProxy/load_sigproxyclient\n?xmldoc=<unsignedxml-url>\n&sigtype=<sigtype>\n&result_to=<result-url>\n&return=<return-url>
 note over External\nWebApp, SigProxy\nServer
   no state preserved between invocations
 end note
-Browser->+SigProxy\nServer: GET /SigProxy/load_sigproxyclient?xmldoc=<unsignedxml-url>\n&sigtype=<sigtype>\n&result_to=<result-path>\n&return=<return-path>
+Browser->+SigProxy\nServer: GET /SigProxy/load_sigproxyclient?xmldoc=<unsignedxml-url>\n&sigtype=<sigtype>\n&result_to=<result-url>\n&return=<return-url>
 SigProxy\nServer-->-Browser: 200 SigProxyClient(unsignedxml-url, sigtype, sigloc, result-url, return-url)
 Browser->+Browser:  autoload \nSigProxyClient \n(Javascript)
 Browser->+External\nWebApp: GET <unsignedxml-url>
@@ -19,16 +19,21 @@ Seclayer running on localhost:3495
 end note
 Browser->+SecLayer: XMLHTTP POST /http-security-layer-request\n(XMLRequest=CreateXMLSignatureRequest)
 SecLayer-->-Browser: HTTP 200 <CreateXMLSignatureResponse>
+alt SecurityLayer:CreateSignatureResponse
 Browser->+SigProxy\nServer: XMLHTTP-Request POST /SigProxy/getsignedxmldoc\n(sigresponse=CreateXMLSignatureResponse)
 SigProxy\nServer-->-Browser: HTTP 200 <signedXML>
 Browser->+External\nWebApp: XMLHTTP-Request POST <result-path>\n(signedxml=<signedXML>)
 External\nWebApp-->-Browser: HTTP 200 OK
+else SecurityLayer:ErrorResponse
+Browser->+SigProxy\nServer: XMLHTTP-Request POST /SigProxy/getsignedxmldoc\n(sigresponse=CreateXMLSignatureResponse)
+SigProxy\nServer-->-Browser: HTTP 204 <error message>
+end
 note left of Browser
-terminationpage 
-has been loaded 
+terminationpage
+has been loaded
 with SigProxyClient
 end note
-Browser->-Browser: document.write\n(termination_page)
+Browser->-Browser: document.location=\nreturn-url
 Browser->Browser: autoload redirect \nto <return-path>
 Browser->+External\nWebApp: GET <return-path>
 External\nWebApp-->-Browser: HTTP 200 Result page
