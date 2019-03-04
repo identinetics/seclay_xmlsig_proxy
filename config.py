@@ -10,12 +10,11 @@ class SigServiceConfig:
     url = '{}://{}:{}/http-security-layer-request'.format(scheme, host, port)
 
 class SigProxyConfig:
-    host = 'localhost'  # address (and non-default port) must be whitelisted in the external webapp's Access-Control-Allow-Origin
-    port = 8080
     # each url parameter containing a url must left-match allowed_urls ('*' to match any):
     allowed_urls = ['http://localhost:8090', ]
-    static_dir = Path(__file__).parent / 'static'
-    werkzeug_use_debugger = False,  # False for production deployment
+    host = 'localhost'  # address (and non-default port) must be whitelisted in the external webapp's Access-Control-Allow-Origin
+    port = 8080
+    #
     # DO NOT CHANGE below for deployment
     rootpath = '/SigProxy'
     loadsigproxyclient_path = f'{rootpath}/loadsigproxyclient'

@@ -37,6 +37,14 @@ and provides following arguments:
 
 ## Deployment
 
+*Development*
+
+    ./sig_proxy_server.py
+    
+*Production with wsgi server, e.g. Gunicorn*
+
+    gunicorn --config=guncicorn_config.py sig_proxy_server_wsgi
+     
 The SigProxy server should be deployed with an TLS-terminating proxy.
 It can be proxied into the namespace of the external webapp; the root path can be rewritten, e.g.
 

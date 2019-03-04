@@ -1,5 +1,6 @@
 enforce
 flake8
+gunicorn
 lxml
 pytest
 requests

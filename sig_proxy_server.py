@@ -7,23 +7,9 @@ enforce.config({'enabled': True, 'mode': 'covariant'})
 import lxml.etree
 from werkzeug.wrappers import Request, Response
 from werkzeug.exceptions import HTTPException, NotFound
-from werkzeug.serving import run_simple
 import config
 from config import SigProxyConfig as cfg
 from get_seclay_request import get_seclay_request
-
-
-# start server
-def main():
-    app_handler = AppHandler()
-    run_simple(
-        cfg.host,
-        cfg.port,
-        app_handler.application,
-        static_files={'/static': str(cfg.static_dir), },
-        use_debugger=cfg.werkzeug_use_debugger,
-        use_reloader=True,
-    )
 
 
 class InvalidArgs(Exception):
@@ -195,6 +181,8 @@ if __name__ == '__main__':
     if sys.version_info < (3, 6):
         raise "must use python 3.6 or higher"
     try:
-        main()
+        from werkzeug.serving import run_simple
+        application = AppHandler().application
+        run_simple(cfg.host, cfg.port, application, use_debugger=True, use_reloader=True, )
     except Exception as e:
         print(str(e))
