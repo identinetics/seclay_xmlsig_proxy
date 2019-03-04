@@ -119,12 +119,22 @@ class AppHandler():
             xml = get_seclay_request(cfg.SIGTYPE_ENVELOPING, unsignedxml)
             return xml
         elif sigtype == cfg.SIGTYPE_SAMLED:
-            ns_prefix = self._get_namespace_prefix(unsignedxml)
+            unsignedxml_tidy = AppHandler._tidy_saml_entitydescriptor(unsignedxml)
+            ns_prefix = self._get_namespace_prefix(unsignedxml_tidy)
             sigpos = f"/{ns_prefix}:EntityDescriptor"
-            xml = get_seclay_request(cfg.SIGTYPE_ENVELOPED, unsignedxml, sigPosition=sigpos)
+            xml = get_seclay_request(cfg.SIGTYPE_ENVELOPED, unsignedxml_tidy, sigPosition=sigpos)
             return xml
         else:
             raise InvalidArgs('sigtype argument value must be in ' + ', '.join(cfg.SIGTYPE_VALUES))
+
+    @staticmethod
+    def _tidy_saml_entitydescriptor(xml: str) -> str:
+        xslt_filename = cfg.tidy_samlentityescriptor_xslt
+        xslt = lxml.etree.parse(xslt_filename)
+        transform = lxml.etree.XSLT(xslt)
+        dom = lxml.etree.fromstring(xml.encode('utf-8'))
+        newdom = transform(dom)
+        return lxml.etree.tostring(newdom, pretty_print=True).decode('utf-8')
 
     def _get_namespace_prefix(self, unsignedxml: str) -> str:
         """ Due to a limitation in the XML signer (SecurityLayer 1.2) the XPath expression for the

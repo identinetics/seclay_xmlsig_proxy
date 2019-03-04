@@ -28,7 +28,7 @@ class SigProxyConfig:
     SIGTYPE_VALUES = (SIGTYPE_ENVELOPING, SIGTYPE_SAMLED, )
     rooturl = f"http://{host}:{port}"
     mandatoryparamtypes = {'result_to': 'url', 'return': 'url', 'sigtype': 'str', 'unsignedxml_url': 'url', }
-
+    tidy_samlentityescriptor_xslt = str(Path(__file__).parent / 'tidy_samled.xslt')
 
 
 # Debug helper
