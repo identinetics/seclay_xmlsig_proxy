@@ -2,18 +2,18 @@ import re
 from config import SigProxyConfig as cfg
 
 
-def get_seclay_request(sig_type: str, sig_data: bytes, sigPosition: str = None) -> bytes:
+def get_seclay_request(sig_type: str, sig_data: str, sigPosition: str = None) -> str:
     ''' return a <CreateXMLSignatureRequest> for requesting either enveloping or
         enveloped XMLDsig from the SecurityLayer signature service.
         sigPosition is the XPath for the element under which an
         enveoped signature shall be positioned, e.g. <md:/EntitiyDescriptor>.
     '''
 
-    def remove_xml_declaration(xml: bytes) -> bytes:
-        return re.sub(r'<\?xml[^?]*\?>'.encode('ascii'), '', xml)
+    def remove_xml_declaration(xml: str) -> str:
+        return re.sub(r'<\?xml[^?]*\?>', '', xml)
 
     if sig_type == cfg.SIGTYPE_ENVELOPING:
-        template = b'''\
+        template = '''\
 <?xml version="1.0" encoding="UTF-8"?>
 <sl:CreateXMLSignatureRequest
   xmlns:sl="http://www.buergerkarte.at/namespaces/securitylayer/1.2#">
@@ -33,7 +33,7 @@ def get_seclay_request(sig_type: str, sig_data: bytes, sigPosition: str = None) 
         return template % sigdata_nodecl
 
     if sig_type == cfg.SIGTYPE_ENVELOPED:
-        template = b'''\
+        template = '''\
 <?xml version="1.0" encoding="UTF-8"?>
 <sl:CreateXMLSignatureRequest
   xmlns:sl="http://www.buergerkarte.at/namespaces/securitylayer/1.2#">
@@ -59,4 +59,4 @@ def get_seclay_request(sig_type: str, sig_data: bytes, sigPosition: str = None) 
   </sl:SignatureInfo>
 </sl:CreateXMLSignatureRequest> '''
         sigdata_nodecl = remove_xml_declaration(sig_data)
-        return template % (sigdata_nodecl, sigPosition.encode('ascii'))
+        return template % (sigdata_nodecl, sigPosition)

@@ -3,9 +3,10 @@ from urllib.parse import urlencode
 # addresses hard coded in sig_proxy.js
 
 class SigProxyConfig:
-    host = 'localhost'
+    host = '127.0.0.1'
     port = 8080
     rootpath = '/SigProxy'
+    static_dir = Path(__file__).parent / 'static'
     loadsigproxyclient_path = f'{rootpath}/loadsigproxyclient'
     make_cresigrequ_url = f'{rootpath}/makecresigrequ'
     getsignedxmldoc_url = f'{rootpath}/getsignedxmldoc'
