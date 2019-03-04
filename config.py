@@ -2,11 +2,22 @@ from pathlib import Path
 from urllib.parse import urlencode
 # addresses hard coded in sig_proxy.js
 
-class SigProxyConfig:
+# Signature Service (Security Layer) address: https/3496 preferred, but requires client certificate installation
+class SigServiceConfig:
     host = '127.0.0.1'
+    port = 3495
+    scheme = 'http'
+    url = '{}://{}:{}/http-security-layer-request'.format(scheme, host, port)
+
+class SigProxyConfig:
+    host = 'localhost'  # address (and non-default port) must be whitelisted in the external webapp's Access-Control-Allow-Origin
     port = 8080
-    rootpath = '/SigProxy'
+    # each url parameter containing a url must left-match allowed_urls ('*' to match any):
+    allowed_urls = ['http://localhost:8090', ]
     static_dir = Path(__file__).parent / 'static'
+    werkzeug_use_debugger = False,  # False for production deployment
+    # DO NOT CHANGE below for deployment
+    rootpath = '/SigProxy'
     loadsigproxyclient_path = f'{rootpath}/loadsigproxyclient'
     make_cresigrequ_url = f'{rootpath}/makecresigrequ'
     getsignedxmldoc_url = f'{rootpath}/getsignedxmldoc'
@@ -18,15 +29,7 @@ class SigProxyConfig:
     SIGTYPE_VALUES = (SIGTYPE_ENVELOPING, SIGTYPE_SAMLED, )
     rooturl = f"http://{host}:{port}"
     mandatoryparamtypes = {'result_to': 'url', 'return': 'url', 'sigtype': 'str', 'unsignedxml_url': 'url', }
-    # each url parameter containing a url must left-match allowed_urls ('*' to match any):
-    allowed_urls = ['http://localhost:8090', ]
 
-
-# Signature Service (Security Layer) address
-class SigServiceConfig:
-    host = 'localhost'
-    port = 3495
-    url = 'http://{}:{}/http-security-layer-request'.format(host, port)
 
 
 # Debug helper

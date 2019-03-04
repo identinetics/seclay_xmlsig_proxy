@@ -21,7 +21,7 @@ def main():
         cfg.port,
         app_handler.application,
         static_files={'/static': str(cfg.static_dir), },
-        use_debugger=True,
+        use_debugger=cfg.werkzeug_use_debugger,
         use_reloader=True,
     )
 
