@@ -11,7 +11,7 @@ class SigServiceConfig:
 
 class SigProxyConfig:
     # each url parameter containing a url must left-match allowed_urls ('*' to match any):
-    allowed_urls = ['http://localhost:8090', ]
+    allowed_urls = ['http://localhost:8090', 'http://localhost:8000',]
     host = 'localhost'  # address (and non-default port) must be whitelisted in the external webapp's Access-Control-Allow-Origin
     port = 8080
     #

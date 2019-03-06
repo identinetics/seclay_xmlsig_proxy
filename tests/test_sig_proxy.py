@@ -12,10 +12,14 @@ def test_loadsigproxyclient():
     assert response.status_code == 200
     expected_result_path = Path('testdata/expected_sig_client.html')
     assert response.text.startswith(expected_result_path.read_text())
+
+
 def test_loadsigproxyclient_parameter_value_not_allowed():
     url = ExtWebappConfig.load_sigproxy_url().replace('=http', '=https')
     response = requests.get(url)
     assert response.status_code == 422
+
+
 def test_make_cresigrequ():
     url = cfg.rooturl + cfg.make_cresigrequ_url
     unsignedxml_path = Path('testdata/unsigned_data.xml')
@@ -24,6 +28,8 @@ def test_make_cresigrequ():
     assert response.status_code == 200
     expected_result_path = Path('testdata/expected_create_sig_requ.xml')
     assert response.text == expected_result_path.read_text()
+
+
 def test_get_signedxmldoc():
     url = cfg.rooturl + cfg.getsignedxmldoc_url
     createxmlsigresp_path = Path('testdata/createxmlsignature_response.xml')
@@ -32,6 +38,7 @@ def test_get_signedxmldoc():
     assert response.status_code == 200
     expected_result_path = Path('testdata/expected_signed_result.xml')
     assert response.text == expected_result_path.read_text()
+
 
 def test_tidy_saml_entitydescriptor():
     xml_path = (Path('testdata/81_signed_validuntil.xml'))
