@@ -3,10 +3,10 @@ window.onload = do_signature_flow;
 
 function do_signature_flow () {
     const ASYNC_FALSE = false;
-    const ERR_CLIENT_CALLBACK1 = {name: "clientcallback1", message: "Error when reading unsigned document from client application"}
-    const ERR_CLIENT_CALLBACK2 = {name: "clientcallback2", message: "Error when returning signed document to client application"}
-    const ERR_PROXY_CALLBACK2 = {name: "proxycallback2", message: "Error when requesting signed XML document from signature proxy"}
-    const ERR_SECLAY = {name: "seclay", message: "Error when sending CreateXMLSignatureRequest to Security Layer"}
+    const ERR_CLIENT_CALLBACK1 = {name: "clientcallback1", message: "Error when reading unsigned document from client application"};
+    const ERR_CLIENT_CALLBACK2 = {name: "clientcallback2", message: "Error when returning signed document to client application"};
+    const ERR_PROXY_CALLBACK2 = {name: "proxycallback2", message: "Error when requesting signed XML document from signature proxy"};
+    const ERR_SECLAY = {name: "seclay", message: "Error when sending CreateXMLSignatureRequest to Security Layer"};
 
     function get_unsigned_xml(url) {
         write_status("reading unsigned XML document");
@@ -32,6 +32,23 @@ function do_signature_flow () {
         return xhr.responseText;
     }
 
+    function handle_securitylayer_error(xmldoc) {
+        // Security Layer reports an error as HTTP 200 , but with a different content XML doc
+        const NS_SL = 'http://www.buergerkarte.at/namespaces/securitylayer/1.2#';
+        var sl_err_elem = xmldoc.getElementsByTagNameNS(NS_SL,'ErrorCode');
+        if (sl_err_elem.length > 0) {
+            var sl_errcode = Array.from(sl_err_elem)[0].textContent;
+            var sl_errmsg_elem = xmldoc.getElementsByTagNameNS(NS_SL, 'Info');
+            var sl_errmsg = Array.from(sl_errmsg_elem)[0].textContent;
+            msg = 'Security Layer failed, returned ' + sl_errcode + ' ' + sl_errmsg;
+            write_status(msg);
+            throw {
+                name: "SecurityLayer",
+                message: msg
+            };
+        }
+    }
+
     function security_layer_request(url, cresignedxml_requ) {
         write_status("requesting Signature from Security Layer");
         var params = "XMLRequest=" + encodeURI(cresignedxml_requ);
@@ -39,7 +56,8 @@ function do_signature_flow () {
         xhr.open("POST", url, ASYNC_FALSE);
         xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
         xhr.send(params);
-        if (xhr.status != 200) throw ERR_SECLAY;  // errors reported in content handled later
+        if (xhr.status != 200) throw ERR_SECLAY;
+        handle_securitylayer_error(xhr.responseXML)
         write_status('Response OK, returned ' +  xhr.responseText.length + ' characters');
         return xhr.responseText;
     }
@@ -50,14 +68,16 @@ function do_signature_flow () {
         var xhr = new XMLHttpRequest();
         xhr.open("POST", url, ASYNC_FALSE);
         xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
-        xhr.send(params);
-        if (xhr.status == 204) {
-            sl_error = JSON.parse(xhr.responseText)
-            throw sl_error
+        try {
+            xhr.send(params);
+        } catch (e) {
+            if (xhr.status == 204) {
+                var sl_error = JSON.parse(xhr.responseText);
+                throw sl_error;
+            } else if (xhr.status != 200) throw ERR_PROXY_CALLBACK2;
         }
-        if (xhr.status != 200) throw ERR_PROXY_CALLBACK2;
         write_status('Response OK, returned ' +  xhr.responseText.length + ' characters');
-        return xhr.responseText
+        return xhr.responseText;
     }
 
     function post_result_to(url, signedxml) {
@@ -66,18 +86,21 @@ function do_signature_flow () {
         var xhr = new XMLHttpRequest();
         xhr.open("POST", url, ASYNC_FALSE);
         xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
-        xhr.send(params);
-         write_status('Response OK, returned ' +  xhr.responseText.length + ' characters');
-       if (xhr.status != 200) throw ERR_CLIENT_CALLBACK2;
+        try {
+            xhr.send(params);
+        } catch (e) {
+            throw ERR_CLIENT_CALLBACK2;
+        }
+        write_status('Response OK, returned ' +  xhr.responseText.length + ' characters');
     }
 
     function load_termination_page(url) {
-        write_status("Signature Proxy/Browser Client says good bye")
-        document.location = url
+        write_status("Signature Proxy/Browser Client says good bye");
+        document.location = url;
     }
 
     function write_status(msg){
-        console.log(msg)
+        console.log(msg);
         messagelist = messagelist + "<li>"+ msg + "</li>";
         messagebox.innerHTML = "<ul>" + messagelist + "</ul>";
     }
@@ -85,19 +108,28 @@ function do_signature_flow () {
     var messagelist = "";
     var messagebox = document.getElementById("messages");
     try {
-        var unsignedxml = get_unsigned_xml("${unsignedxml_url}");
-        var cresignedxml_requ = get_cresignedxml_requ("${make_cresigrequ_url}", unsignedxml, "${sigtype}");
-        var cresignedxml_resp = security_layer_request("${sigservice_url}", cresignedxml_requ);
-        var signedxml_resp = getsignedxmldoc("${getsignedxmldoc_url}", cresignedxml_resp);
-        post_result_to("${result_to}", signedxml_resp);
-        err_params = ''
+        var next_url = "${unsignedxml_url}";
+        var unsignedxml = get_unsigned_xml(next_url);
+        next_url = "${make_cresigrequ_url}";
+        var cresignedxml_requ = get_cresignedxml_requ(next_url, unsignedxml, "${sigtype}");
+        next_url = "${sigservice_url}";
+        var cresignedxml_resp = security_layer_request(next_url, cresignedxml_requ);
+        next_url = "${getsignedxmldoc_url}";
+        var signedxml_resp = getsignedxmldoc(next_url, cresignedxml_resp);
+        next_url = "${result_to}";
+        post_result_to(next_url, signedxml_resp);
+        var err_params = '';
     } catch(err) {
-        if (err.name == 'NetworkError')
-            msg = '(' + err.name + ') ' + err.message + err.sourceURL;
-        else
-            msg = '(' + err.name + ') ' + err.message
-        alert('The signature request could not be completed. \nReason: ' + msg)
-        err_params = '?code=' + encodeURI(err.name) + "&msg=" + encodeURI(err.message)
+        var msg = '';
+        if (err.name == 'NetworkError') {
+            msg = '(' + err.name + ') ' + err.message + ' \n' + next_url;
+        } else {
+            msg = '(' + err.name + ') ' + err.message;
+        }
+        write_status(msg);
+        setTimeout(Function.prototype, 5000);
+        alert('The signature request could not be completed. \nReason: ' + msg);
+        err_params = '?code=' + encodeURI(err.name) + "&msg=" + encodeURI(err.message);
     }
-    load_termination_page("${return}" + err_params)
+    load_termination_page("${return}" + err_params);
 }

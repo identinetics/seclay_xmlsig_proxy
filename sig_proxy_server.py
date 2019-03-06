@@ -30,14 +30,7 @@ class AppHandler():
     # --- GET handler ---
     def do_GET(self, req: Request) -> Response:
         if req.path.startswith(cfg.loadsigproxyclient_path):
-            try:
-                return self._loadsigproxyclient(req)
-            except SeclayError as e:
-                response = Response(str(e))
-                response.status_code = 204
-                response.headers['content-type'] = 'application/json'
-                response.headers['Cache-Control'] = 'no-cache'
-                return response
+            return self._loadsigproxyclient(req)
         else:
             raise NotFound
 
@@ -158,12 +151,13 @@ class AppHandler():
             response.headers['content-type'] = 'application/xml'
             response.headers['Cache-Control'] = 'no-cache'
             return response
-        elif re.search(r'<sl:ErrorCode>', post_data):
-            root_tree = lxml.etree.fromstring(post_data).getroottree()
+        elif re.search(r'<sl:ErrorCode>', post_data):  # SL error now handled by AJAX client
+            post_data_b: bytes = post_data.encode('utf-8')   # seclay should always return UTF-8
+            root_tree = lxml.etree.fromstring(post_data_b).getroottree()
             err_code = root_tree.find('//sl:ErrorCode', namespaces={
                 'sl': 'http://www.buergerkarte.at/namespaces/securitylayer/1.2#'}).text
             err_msg = root_tree.find('//sl:Info', namespaces={
-                'sl': 'http://www.buergerkarte.at/namespaces/securitylayer/1.2#'}).text == 'Unklassifizierter Fehler in der Transportbindung.'
+                'sl': 'http://www.buergerkarte.at/namespaces/securitylayer/1.2#'}).text
             error_json = '{"name": "SecurityLayer %s", "message": "%s"}' % (err_code, err_msg)
             raise SeclayError(error_json)
 
@@ -182,6 +176,11 @@ class AppHandler():
             response = Response(status='404 ' + str(e))
         except InvalidArgs as e:
             response = Response(status='422 ' + str(e))
+        except SeclayError as e:
+            response = Response(str(e))
+            response.status_code = 200
+            response.headers['content-type'] = 'application/json'
+            response.headers['Cache-Control'] = 'no-cache'
         except Exception as e:
             response = Response(status='400 ' + str(e))
         return response(environ, start_response)
