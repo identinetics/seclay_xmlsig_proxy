@@ -1,7 +1,9 @@
+import logging
 import re
 import string
 import sys
 import unicodedata
+import urllib
 import enforce
 enforce.config({'enabled': True, 'mode': 'covariant'})
 import lxml.etree
@@ -102,7 +104,7 @@ class AppHandler():
         unsignedxml = req.form['unsignedxml']
         #unsignedxml = urllib.parse.unquote(unsignedxml_qt)
         create_xml_signature_request = self._get_CreateXMLSignatureRequest(sigtype, unsignedxml)
-        response = Response(create_xml_signature_request)
+        response = Response(urllib.parse.quote_plus(create_xml_signature_request))
         response.headers['content-type'] = 'application/xml'
         response.headers['Cache-Control'] = 'no-cache'
         return response
@@ -140,8 +142,27 @@ class AppHandler():
         m = p.search(unsignedxml)
         return m.group(1)
 
+    def _save_cresigresponse_for_debug(self, xml: str) -> None:
+        if getattr(cfg, 'siglog_path', False):
+            try:
+                cfg.siglog_path.mkdir(parents=True, exist_ok=True)
+            except FileExistsError as e:
+                pass
+            fp = cfg.siglog_path / 'createxmlsigresponse.xml'
+            with (fp).open('w') as fd:
+                fd.write(xml)
+                logging.info('saved CreateXMLSignatureResponse in ' + str(fp))
+
+    def _save_signedxmldoc_for_debug(self, xml: bytes) -> None:
+        if getattr(cfg, 'siglog_path', False):
+            fp = cfg.siglog_path / 'signedxml.xml'
+            with (fp).open('wb') as fd:
+                fd.write(xml)
+                logging.info('saved CreateXMLSignatureResponse in ' + str(fp))
+
     def _get_signedxmldoc(self, req: Request) -> Response:
         post_data = req.form['sigresponse']
+        self._save_cresigresponse_for_debug(post_data)
         # Strip xml root element (CreateXMLSignatureResponse), making disg:Signature the new root:
         # (keeping namespace prefixes + whitespace - otherwise the signature would break. Therefore NOT parsing xml.)
         if re.search(r'<sl:CreateXMLSignatureResponse [^>]*>', post_data):
@@ -150,8 +171,10 @@ class AppHandler():
             response = Response(r2)
             response.headers['content-type'] = 'application/xml'
             response.headers['Cache-Control'] = 'no-cache'
+            self._save_signedxmldoc_for_debug(response.data)
             return response
         elif re.search(r'<sl:ErrorCode>', post_data):  # SL error now handled by AJAX client
+            self._save_signedxmldoc_for_debug(post_data)
             post_data_b: bytes = post_data.encode('utf-8')   # seclay should always return UTF-8
             root_tree = lxml.etree.fromstring(post_data_b).getroottree()
             err_code = root_tree.find('//sl:ErrorCode', namespaces={

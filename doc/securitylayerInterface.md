@@ -4,7 +4,11 @@
 
 Write POST reqeust contents (not encoded) to a file and pipe it into:
 
-    curl -v --data-urlencode "XMLRequest=@-" http://127.0.0.1:3495/http-security-layer-request
+    cat tests/testdata/seclay_createsig_preenc_ok.request | curl -v --data "@-" http://127.0.0.1:13495/http-security-layer-request  
+    # or
+    curl -v --data @tests/testdata/seclay_createsig_preenc_ok.request http://127.0.0.1:13495/http-security-layer-request
+
+
 
 Example file: tests/testdata/ seclay_createsig_ok.request
 

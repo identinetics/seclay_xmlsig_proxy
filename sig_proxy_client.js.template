@@ -18,9 +18,9 @@ function do_signature_flow () {
         };
     }
 
-    function fetch_cresignedxml_request(url, unsignedxml, sigtype) {
+    function fetch_cresignedxml_request(url, unsignedxml_encoded, sigtype) {
         write_status("requesting CreateXMLSignatureRequest");
-        let params = "sigtype=" + sigtype + "&unsignedxml=" + encodeURI(unsignedxml);
+        let params = "sigtype=" + sigtype + "&unsignedxml=" + unsignedxml_encoded;
         let xhr = new XMLHttpRequest();
         xhr.open("POST", url, ASYNC_FALSE);
         xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
@@ -30,7 +30,7 @@ function do_signature_flow () {
             return xhr.responseText;
         } else throw {
             name: "proxycallback1",
-            message: "HTTP " + xhr.status + " when requesting CreateXMLSignatureRequest from " + url
+            message: "HTTP " + xhr.status  + " '" + xhr.statusText + "' when requesting CreateXMLSignatureRequest from " + url
         };
     }
 
@@ -51,9 +51,9 @@ function do_signature_flow () {
         }
     }
 
-    function security_layer_request(url, cresignedxml_requ) {
+    function security_layer_request(url, cresignedxml_requ_encoded) {
         write_status("requesting Signature from Security Layer");
-        let params = "XMLRequest=" + encodeURIComponent(cresignedxml_requ);
+        let params = "XMLRequest=" + cresignedxml_requ_encoded;
         let xhr = new XMLHttpRequest();
         xhr.open("POST", url, ASYNC_FALSE);
         xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
@@ -67,19 +67,16 @@ function do_signature_flow () {
 
     function fetch_signedxmldoc(url, cresignedxml_resp) {
         write_status("extracting signed XML doc from Security Layer response");
-        let params = "sigresponse=" + encodeURI(cresignedxml_resp);
+        let params = "sigresponse=" + encodeURIComponent(cresignedxml_resp);
         let xhr = new XMLHttpRequest();
         xhr.open("POST", url, ASYNC_FALSE);
         xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
-        try {
-            xhr.send(params);
-        } catch (e) {
-            if (xhr.status === 204) {
-                let sl_error = JSON.parse(xhr.responseText);
-                throw sl_error;
-            } else if (xhr.status !== 200) {
-                throw {name: "proxycallback2", message: "HTTP " + xhr.status + "when requesting signed XML document from " + url};
-            }
+        xhr.send(params);
+        if (xhr.status === 204) {
+            let sl_error = JSON.parse(xhr.responseText);
+            throw sl_error;
+        } else if (xhr.status !== 200) {
+            throw {name: "proxycallback2", message: "HTTP " + xhr.status + " '" + xhr.statusText + "' when requesting signed XML document from " + url};
         }
         write_status('Response OK, returned ' +  xhr.responseText.length + ' characters');
         return xhr.responseText;
@@ -87,7 +84,7 @@ function do_signature_flow () {
 
     function post_result_to(url, signedxml) {
         write_status("posting signed XML doc to requesting application");
-        let params = "signedxml=" + (signedxml);
+        let params = "signedxml=" + encodeURIComponent(signedxml);
         let xhr = new XMLHttpRequest();
         xhr.open("POST", url, ASYNC_FALSE);
         xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
@@ -95,7 +92,7 @@ function do_signature_flow () {
         if (xhr.status !== 200) {
             throw {
                 name: "clientcallback2",
-                message: 'HTTP ' + xhr.status + ' (' + xhr.message + ') when posting signed xml to ' + url
+                message: 'HTTP ' + xhr.status + ' (' + xhr.statusText + ') when posting signed xml to ' + url
             };
         }
         write_status('Response OK, returned ' +  xhr.responseText.length + ' characters');
@@ -130,11 +127,11 @@ function do_signature_flow () {
     let err_params = '';
     try {
         next_url = "${unsignedxml_url}";
-        let unsignedxml = fetch_unsigned_xml(next_url);
+        let unsignedxml_encoded = fetch_unsigned_xml(next_url);
         next_url = "${make_cresigrequ_url}";
-        let cresignedxml_requ = fetch_cresignedxml_request(next_url, unsignedxml, "${sigtype}");
+        let cresignedxml_requ_encoded = fetch_cresignedxml_request(next_url, unsignedxml_encoded, "${sigtype}");
         next_url = "${sigservice_url}";
-        let cresignedxml_resp = security_layer_request(next_url, cresignedxml_requ);
+        let cresignedxml_resp = security_layer_request(next_url, cresignedxml_requ_encoded);
         next_url = "${getsignedxmldoc_url}";
         let signedxml_resp = fetch_signedxmldoc(next_url, cresignedxml_resp);
         next_url = "${result_to}";
