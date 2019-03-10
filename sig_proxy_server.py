@@ -51,8 +51,8 @@ class AppHandler():
     def _render_sigproxyclient_js(self, req: Request) -> str:
         urlparams_sane = self._sanitize(dict(req.args))
         js_params = {
-            'getsignedxmldoc_url': cfg.rooturl + cfg.getsignedxmldoc_url,
-            'make_cresigrequ_url': cfg.rooturl + cfg.make_cresigrequ_url,
+            'getsignedxmldoc_url': cfg.ext_origin  + cfg.getsignedxmldoc_url,
+            'make_cresigrequ_url': cfg.ext_origin  + cfg.make_cresigrequ_url,
             'sigservice_url': config.SigServiceConfig.url,
             **urlparams_sane,
         }

@@ -10,11 +10,15 @@ class SigServiceConfig:
     url = '{}://{}:{}/http-security-layer-request'.format(scheme, host, port)
 
 class SigProxyConfig:
-    # each url parameter containing a url must left-match allowed_urls ('*' to match any):
-    allowed_urls = ['http://localhost:8090', 'http://localhost:8000',]
+    # Start this service at host/port:
     host = 'localhost'  # address (and non-default port) must be whitelisted in the external webapp's Access-Control-Allow-Origin
-    port = 8080
+    port = 8001
+    # External Origin as seen by the browser
+    ext_origin = 'http://localhost:8080'
     #
+    # each url parameter containing a url must left-match allowed_urls ('*' to match any):
+    allowed_urls = ['http://localhost:8080', ]
+
     # DO NOT CHANGE below for deployment
     rootpath = '/SigProxy'
     loadsigproxyclient_path = f'{rootpath}/loadsigproxyclient'
@@ -29,6 +33,7 @@ class SigProxyConfig:
     rooturl = f"http://{host}:{port}"
     mandatoryparamtypes = {'result_to': 'url', 'return': 'url', 'sigtype': 'str', 'unsignedxml_url': 'url', }
     tidy_samlentityescriptor_xslt = str(Path(__file__).parent / 'tidy_samled.xslt')
+    siglog_path = Path(__file__).parent / 'work/siglog/'
 
 
 # Debug helper

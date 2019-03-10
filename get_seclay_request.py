@@ -1,5 +1,17 @@
+import logging
 import re
 from config import SigProxyConfig as cfg
+
+def _save_request_for_debug(xml: str) -> None:
+    if getattr(cfg, 'siglog_path', False):
+        try:
+            cfg.siglog_path.mkdir(parents=True, exist_ok=True)
+        except FileExistsError as e:
+            pass
+        fp = cfg.siglog_path / 'createxmlsigrequest.xml'
+        with (fp).open('w') as fd:
+            fd.write(xml)
+            logging.info('saved CreateXMLSignatureRequest in ' + str(fp))
 
 
 def get_seclay_request(sig_type: str, sig_data: str, sigPosition: str = None) -> str:
@@ -30,7 +42,9 @@ def get_seclay_request(sig_type: str, sig_data: str, sigPosition: str = None) ->
   </sl:DataObjectInfo>
 </sl:CreateXMLSignatureRequest> '''
         sigdata_nodecl = remove_xml_declaration(sig_data)
-        return template % sigdata_nodecl
+        xml_str = template % sigdata_nodecl
+        _save_request_for_debug(xml_str)
+        return xml_str
 
     if sig_type == cfg.SIGTYPE_ENVELOPED:
         template = '''\
@@ -59,4 +73,9 @@ def get_seclay_request(sig_type: str, sig_data: str, sigPosition: str = None) ->
   </sl:SignatureInfo>
 </sl:CreateXMLSignatureRequest> '''
         sigdata_nodecl = remove_xml_declaration(sig_data)
-        return template % (sigdata_nodecl, sigPosition)
+        xml_str = template % (sigdata_nodecl, sigPosition)
+        try:
+            _save_request_for_debug(xml_str)
+        except Exception as e:
+            raise e
+        return xml_str
