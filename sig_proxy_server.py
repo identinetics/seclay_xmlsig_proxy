@@ -255,6 +255,10 @@ def number_of_workers():
         return (multiprocessing.cpu_count() * 2) + 1
 
 
+def get_application():
+    return AppHandler().application
+
+
 if __name__ == '__main__':
     if sys.version_info < (3, 6):
         raise Exception("must use python 3.6 or higher")
