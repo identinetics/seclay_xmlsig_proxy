@@ -1,0 +1,21 @@
+= Security Considerations
+
+== Cross-site scripting (XSS)
+
+User input is expected only in the URL parameter values of the initial invocation.
+These values are escaped in sig_proxy_server.py/_sanitize()
+
+sign_proxy_client.js writes the DOM in following locations:
+
+|===
+| source                  | event                  | safeguard
+| load_termination_page() | document.location      | location is whitelisted by sig_proxy_server.py
+| write_status()          | messagebox.innerHTML = | content escaped + source not from user
+|===
+
+
+== Cross-site Request Forgery (CSRF)
+
+Using the Encryption based Token Pattern, server-encrypted tokens are exchanged with POST requests.
+The tokens have fixed names (csrftoken4proxy and csrftoken4webapp).
+Token values include a nonce and time stamp, and when validated in the POST handler must show a valid text and age after dcryption.

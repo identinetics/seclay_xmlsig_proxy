@@ -2,5 +2,7 @@ enforce
 flake8
 gunicorn
 lxml
+pycryptodome
 pytest
 requests
+werkzeug

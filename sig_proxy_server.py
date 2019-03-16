@@ -1,17 +1,21 @@
 import logging
+import os
 import re
 import string
 import sys
 import unicodedata
 import urllib
 import enforce
-enforce.config({'enabled': True, 'mode': 'covariant'})
+import gunicorn.app.base
 import lxml.etree
 from werkzeug.wrappers import Request, Response
-from werkzeug.exceptions import HTTPException, NotFound
+from werkzeug.exceptions import BadRequest, MethodNotAllowed, NotFound
 import config
-from config import SigProxyConfig as cfg
+from config import SigProxyConfig as Cfg
+from csrf_token import CsrfToken
 from get_seclay_request import get_seclay_request
+
+enforce.config({'enabled': True, 'mode': 'covariant'})
 
 
 class InvalidArgs(Exception):
@@ -23,15 +27,15 @@ class InvalidPath(Exception):
 
 
 class SeclayError(Exception):
-    ''' Error reported in response content with HTTP code 200 '''
+    """ Error reported in response content with HTTP code 200 """
     pass
 
 
-#@enforce.runtime_validation
-class AppHandler():
+# @enforce.runtime_validation
+class AppHandler:
     # --- GET handler ---
     def do_GET(self, req: Request) -> Response:
-        if req.path.startswith(cfg.loadsigproxyclient_path):
+        if req.path.startswith(Cfg.loadsigproxyclient_path):
             return self._loadsigproxyclient(req)
         else:
             raise NotFound
@@ -45,36 +49,39 @@ class AppHandler():
 
     def _render_sigproxyclient_html(self, req: Request) -> str:
         sigproxyclient_js = self._render_sigproxyclient_js(req)
-        with cfg.sig_proxy_html_template.open('r') as fd:
+        with Cfg.sig_proxy_html_template.open('r') as fd:
             html_template = string.Template(fd.read())
         html = html_template.substitute({'javascript': sigproxyclient_js})
         return html
 
     def _render_sigproxyclient_js(self, req: Request) -> str:
-        urlparams_sane = self._sanitize(dict(req.args))
+        urlparams_sane = AppHandler._sanitize(dict(req.args))
         js_params = {
-            'getsignedxmldoc_url': cfg.ext_origin  + cfg.getsignedxmldoc_url,
-            'make_cresigrequ_url': cfg.ext_origin  + cfg.make_cresigrequ_url,
+            'getsignedxmldoc_url': Cfg.ext_origin + Cfg.getsignedxmldoc_url,
+            'make_cresigrequ_url': Cfg.ext_origin + Cfg.make_cresigrequ_url,
             'sigservice_url': config.SigServiceConfig.url,
+            'csrftoken4proxy': CsrfToken.create_token(),
             **urlparams_sane,
         }
-        with cfg.sig_proxy_js_template.open('r') as fd:
+        with Cfg.sig_proxy_js_template.open('r') as fd:
             js_template = string.Template(fd.read())
         js = js_template.substitute(js_params)
         return js
 
-    def _sanitize(self, urlparams: dict) -> dict:
-        mandatoryparams = set(cfg.mandatoryparamtypes.keys())
+    @staticmethod
+    def _sanitize(urlparams: dict) -> dict:
+        mandatoryparams = set(Cfg.mandatoryparamtypes.keys())
         if 'sigtype' not in urlparams:
-            urlparams['sigtype'] = cfg.SIGTYPE_SAMLED
+            urlparams['sigtype'] = Cfg.SIGTYPE_SAMLED
         if len(set(urlparams.keys()).difference(mandatoryparams)) > 0:
-            raise InvalidArgs(f"URL parameters must be these: {mandatoryparams}. {set(urlparams.keys()).difference(mandatoryparams)}?")
-        if urlparams['sigtype'] not in cfg.SIGTYPE_VALUES:
-            raise InvalidArgs(f"URL parameters must be on of: {cfg.SIGTYPE_VALUES}")
+            raise InvalidArgs(f"URL parameters must be these: {mandatoryparams}."
+                              f" {set(urlparams.keys()).difference(mandatoryparams)}?")
+        if urlparams['sigtype'] not in Cfg.SIGTYPE_VALUES:
+            raise InvalidArgs(f"URL parameters must be on of: {Cfg.SIGTYPE_VALUES}")
         urlparams_sane = {}
         valid_chars = "-_.:+/%s%s" % (string.ascii_letters, string.digits)   # restrictive charset
-        for k,v1 in urlparams.items():
-            if not self.is_allowed_host(k, v1):
+        for k, v1 in urlparams.items():
+            if not AppHandler.is_allowed_host(k, v1):
                 raise InvalidArgs(f"URL parameter {k} is not an allowed_host: {v1}")
             v2 = unicodedata.normalize('NFKD', v1)
             v3 = v2.encode('ascii', 'ignore').decode('ascii')
@@ -82,27 +89,37 @@ class AppHandler():
             urlparams_sane[k] = v4
         return urlparams_sane
 
-    def is_allowed_host(self, param_name, param_value) -> bool:
-        if cfg.mandatoryparamtypes[param_name] != 'url':
+    @staticmethod
+    def is_allowed_host(param_name, param_value) -> bool:
+        if Cfg.mandatoryparamtypes[param_name] != 'url':
             return True
-        for url in cfg.allowed_urls:
+        for url in Cfg.allowed_urls:
             if param_value.startswith(url) or url == '*':
                 return True
         return False
 
     # --- POST handler ---
     def do_POST(self, req: Request) -> Response:
-        if req.path == cfg.make_cresigrequ_url:
+        self._validate_csrf(req)
+        if req.path == Cfg.make_cresigrequ_url:
             return self._make_cresigrequ(req)
-        elif req.path == cfg.getsignedxmldoc_url:
+        elif req.path == Cfg.getsignedxmldoc_url:
             return self._get_signedxmldoc(req)
         else:
             raise NotFound
 
+    def _validate_csrf(self, req):
+        try:
+            CsrfToken.validate_token(req.form['csrftoken4proxy'])
+        except KeyError:
+            raise Exception('Missing CSRF token in POST request')
+        except ValueError as e:
+            raise e
+
     def _make_cresigrequ(self, req: Request) -> Response:
-        sigtype = req.args[b'sigtype'][0].decode('utf-8') if b'sigtype' in req.args else cfg.SIGTYPE_SAMLED
+        sigtype = req.args[b'sigtype'][0].decode('utf-8') if b'sigtype' in req.args else Cfg.SIGTYPE_SAMLED
         unsignedxml = req.form['unsignedxml']
-        #unsignedxml = urllib.parse.unquote(unsignedxml_qt)
+        # unsignedxml = urllib.parse.unquote(unsignedxml_qt)
         create_xml_signature_request = self._get_CreateXMLSignatureRequest(sigtype, unsignedxml)
         response = Response(urllib.parse.quote_plus(create_xml_signature_request))
         response.headers['content-type'] = 'application/xml'
@@ -110,21 +127,21 @@ class AppHandler():
         return response
 
     def _get_CreateXMLSignatureRequest(self, sigtype: str, unsignedxml: str) -> str:
-        if sigtype == cfg.SIGTYPE_ENVELOPING:
-            xml = get_seclay_request(cfg.SIGTYPE_ENVELOPING, unsignedxml)
+        if sigtype == Cfg.SIGTYPE_ENVELOPING:
+            xml = get_seclay_request(Cfg.SIGTYPE_ENVELOPING, unsignedxml)
             return xml
-        elif sigtype == cfg.SIGTYPE_SAMLED:
+        elif sigtype == Cfg.SIGTYPE_SAMLED:
             unsignedxml_tidy = AppHandler._tidy_saml_entitydescriptor(unsignedxml)
             ns_prefix = self._get_namespace_prefix(unsignedxml_tidy)
             sigpos = f"/{ns_prefix}:EntityDescriptor"
-            xml = get_seclay_request(cfg.SIGTYPE_ENVELOPED, unsignedxml_tidy, sigPosition=sigpos)
+            xml = get_seclay_request(Cfg.SIGTYPE_ENVELOPED, unsignedxml_tidy, sigPosition=sigpos)
             return xml
         else:
-            raise InvalidArgs('sigtype argument value must be in ' + ', '.join(cfg.SIGTYPE_VALUES))
+            raise InvalidArgs('sigtype argument value must be in ' + ', '.join(Cfg.SIGTYPE_VALUES))
 
     @staticmethod
     def _tidy_saml_entitydescriptor(xml: str) -> str:
-        xslt_filename = cfg.tidy_samlentityescriptor_xslt
+        xslt_filename = Cfg.tidy_samlentityescriptor_xslt
         xslt = lxml.etree.parse(xslt_filename)
         transform = lxml.etree.XSLT(xslt)
         dom = lxml.etree.fromstring(xml.encode('utf-8'))
@@ -143,22 +160,22 @@ class AppHandler():
         return m.group(1)
 
     def _save_cresigresponse_for_debug(self, xml: str) -> None:
-        if getattr(cfg, 'siglog_path', False):
+        if getattr(Cfg, 'siglog_path', False):
             try:
-                cfg.siglog_path.mkdir(parents=True, exist_ok=True)
+                Cfg.siglog_path.mkdir(parents=True, exist_ok=True)
             except FileExistsError as e:
                 pass
-            fp = cfg.siglog_path / 'createxmlsigresponse.xml'
+            fp = Cfg.siglog_path / 'createxmlsigresponse.xml'
             with (fp).open('w') as fd:
                 fd.write(xml)
-                logging.info('saved CreateXMLSignatureResponse in ' + str(fp))
+                logging.debug('saved CreateXMLSignatureResponse in ' + str(fp))
 
     def _save_signedxmldoc_for_debug(self, xml: bytes) -> None:
-        if getattr(cfg, 'siglog_path', False):
-            fp = cfg.siglog_path / 'signedxml.xml'
+        if getattr(Cfg, 'siglog_path', False):
+            fp = Cfg.siglog_path / 'signedxml.xml'
             with (fp).open('wb') as fd:
                 fd.write(xml)
-                logging.info('saved CreateXMLSignatureResponse in ' + str(fp))
+                logging.debug('saved CreateXMLSignatureResponse in ' + str(fp))
 
     def _get_signedxmldoc(self, req: Request) -> Response:
         post_data = req.form['sigresponse']
@@ -187,13 +204,14 @@ class AppHandler():
     # --- WSGI handler ---
     def application(self, environ, start_response):
         req = Request(environ)
+        logging.info(req.method + ' ' + req.path)
         try:
             if req.method == 'POST':
                 response = self.do_POST(req)
             elif req.method == 'GET':
                 response = self.do_GET(req)
             else:
-                response = Response(status='405 HTTP method not supported')
+                return MethodNotAllowed
         except NotFound as e:
             #return Response(str(e), status=404)
             response = Response(status='404 ' + str(e))
@@ -204,17 +222,50 @@ class AppHandler():
             response.status_code = 200
             response.headers['content-type'] = 'application/json'
             response.headers['Cache-Control'] = 'no-cache'
+        except BadRequest as e:
+            return e
         except Exception as e:
-            response = Response(status='400 ' + str(e))
+            raise BadRequest(description=str(e))
         return response(environ, start_response)
+
+
+
+
+class StandaloneApplication(gunicorn.app.base.BaseApplication):
+    def __init__(self, app, options=None):
+        self.options = options or {}
+        self.application = app
+        super(StandaloneApplication, self).__init__()
+
+    def load_config(self):
+        config = dict([(key, value) for key, value in self.options.items()
+                       if key in self.cfg.settings and value is not None])
+        for key, value in config.items():
+            self.cfg.set(key.lower(), value)
+
+    def load(self):
+        return self.application
+
+
+def number_of_workers():
+    if 'DEBUG' in os.environ:
+        return 1
+    else:
+        import multiprocessing
+        return (multiprocessing.cpu_count() * 2) + 1
 
 
 if __name__ == '__main__':
     if sys.version_info < (3, 6):
-        raise "must use python 3.6 or higher"
+        raise Exception("must use python 3.6 or higher")
     try:
-        from werkzeug.serving import run_simple
         application = AppHandler().application
-        run_simple(cfg.host, cfg.port, application, use_debugger=True, use_reloader=True, )
+        options = {
+            'bind': '%s:%s' % (Cfg.host, Cfg.port),
+            'workers': number_of_workers(),
+            'timeout': 18000,
+        }
+        StandaloneApplication(application, options).run()
     except Exception as e:
         print(str(e))
+

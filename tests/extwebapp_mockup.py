@@ -43,14 +43,14 @@ class RequestHandler(BaseHTTPRequestHandler):
         def do_unsignedxml_path():
             self.send_response(200)
             self.send_header('Content-type', 'text/html')
-            self.send_header("Access-Control-Allow-Origin", SigProxyConfig.rooturl)
+            self.send_header("Access-Control-Allow-Origin", SigProxyConfig.ext_origin)
             self.end_headers()
             self.wfile.write(self.test_unsignedxml)
 
         def do_resultpage():
             self.send_response(200)
             self.send_header('Content-type', 'text/plain')
-            self.send_header("Access-Control-Allow-Origin", SigProxyConfig.rooturl)
+            self.send_header("Access-Control-Allow-Origin", SigProxyConfig.ext_origin)
             self.end_headers()
             urlparts = urllib.parse.urlparse(self.path)
             urlparams = dict(urllib.parse.parse_qsl(urlparts.query))
@@ -62,7 +62,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             self.wfile.write(content)
             return
 
-        logging.info(f"GET {self.path}")
+        logging.warning(f"GET {self.path}")
         if re.match(self.cfg.unsignedxml_path, self.path):
             do_unsignedxml_path()
         elif re.match(self.cfg.returnto_path, self.path):
