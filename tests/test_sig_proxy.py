@@ -1,14 +1,22 @@
-from pathlib import Path
 import requests
+from pathlib import Path
+import urllib
 import pytest
-from config import SigProxyConfig as cfg
+from seclay_xmlsig_proxy_config import SigProxyConfig as Cfg
 from tests.config_extwebapp import ExtWebappConfig
-from sig_proxy_server import AppHandler
+
+
+
+@pytest.fixture(scope='module')
+def csrf_token():
+    url = ExtWebappConfig.getmycsrftoken_url()
+    response = requests.get(url, headers={'REMOTE-USER': 'user273'})
+    return response.text
 
 
 def test_loadsigproxyclient():
     url = ExtWebappConfig.load_sigproxy_url()
-    response = requests.get(url)
+    response = requests.get(url, headers={'REMOTE-USER': 'user273'})
     assert response.status_code == 200
     expected_result_path = Path('testdata/expected_sig_client.html')
     assert response.text.startswith(expected_result_path.read_text())
@@ -20,31 +28,44 @@ def test_loadsigproxyclient_parameter_value_not_allowed():
     assert response.status_code == 422
 
 
-def test_make_cresigrequ():
-    url = cfg.ext_origin + cfg.make_cresigrequ_url
+def test_make_cresigrequ_missing_csrf_token():
+    url = Cfg.ext_origin + Cfg.make_cresigrequ_url
     unsignedxml_path = Path('testdata/unsigned_data.xml')
     postdata = {'unsignedxml': unsignedxml_path.read_text()}
-    response = requests.post(url, data=postdata)
+    try:
+        response = requests.post(url, data=postdata, headers={'REMOTE-USER': 'user273'})
+    except Exception as e:
+        raise e
+    assert response.status_code == 400
+
+
+def test_make_cresigrequ(csrf_token):
+    url = Cfg.ext_origin + Cfg.make_cresigrequ_url
+    unsignedxml_path = Path('testdata/unsigned_data.xml')
+    postdata = {'unsignedxml': unsignedxml_path.read_text(),
+                'csrftoken4proxy': csrf_token}
+    response = requests.post(url, data=postdata, headers={'REMOTE-USER': 'user273'})
     assert response.status_code == 200
     expected_result_path = Path('testdata/expected_create_sig_requ.xml')
-    assert response.text == expected_result_path.read_text()
+    assert urllib.parse.unquote_plus(response.text) == expected_result_path.read_text()
 
 
-def test_get_signedxmldoc():
-    url = cfg.ext_origin + cfg.getsignedxmldoc_url
-    createxmlsigresp_path = Path('testdata/createxmlsignature_response.xml')
-    postdata = {'sigresponse': createxmlsigresp_path.read_text()}
-    response = requests.post(url, data=postdata)
-    assert response.status_code == 200
-    expected_result_path = Path('testdata/expected_signed_result.xml')
-    assert response.text == expected_result_path.read_text()
-
-
-def test_tidy_saml_entitydescriptor():
-    xml_path = (Path('testdata/81_signed_validuntil.xml'))
-    expected_result_path = (Path('testdata/81_tidied_result.xml'))
-    try:
-        tidy_xml = AppHandler._tidy_saml_entitydescriptor(xml_path.read_text())
-    except Exception as e:
-        print(str(e))
-    assert tidy_xml == expected_result_path.read_text()
+# def test_get_signedxmldoc():
+#     url = Cfg.ext_origin + Cfg.getsignedxmldoc_url
+#     createxmlsigresp_path = Path('testdata/createxmlsignature_response.xml')
+#     postdata = {'sigresponse': createxmlsigresp_path.read_text()}
+#     response = requests.post(url, data=postdata, headers={'REMOTE-USER': 'user273'})
+#     assert response.status_code == 200
+#     expected_result_path = Path('testdata/expected_signed_result.xml')
+#     assert response.text == expected_result_path.read_text()
+#
+#
+# def test_tidy_saml_entitydescriptor():
+#     xml_path = (Path('testdata/81_signed_validuntil.xml'))
+#     expected_result_path = (Path('testdata/81_tidied_result.xml'))
+#     try:
+#         tidy_xml = AppHandler._tidy_saml_entitydescriptor(xml_path.read_text())
+#     except Exception as e:
+#         raise e
+#     else:
+#         assert tidy_xml == expected_result_path.read_text()

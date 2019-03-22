@@ -9,9 +9,9 @@ import enforce
 import gunicorn.app.base
 import lxml.etree
 from werkzeug.wrappers import Request, Response
-from werkzeug.exceptions import BadRequest, MethodNotAllowed, NotFound
-import config
-from config import SigProxyConfig as Cfg
+from werkzeug.exceptions import BadRequest, NotFound
+import seclay_xmlsig_proxy_config
+from seclay_xmlsig_proxy_config import SigProxyConfig as Cfg
 from csrf_token import CsrfToken
 from get_seclay_request import get_seclay_request
 
@@ -26,6 +26,10 @@ class InvalidPath(Exception):
     pass
 
 
+class MissingCsrfToken(Exception):
+    pass
+
+
 class SeclayError(Exception):
     """ Error reported in response content with HTTP code 200 """
     pass
@@ -35,10 +39,22 @@ class SeclayError(Exception):
 class AppHandler:
     # --- GET handler ---
     def do_GET(self, req: Request) -> Response:
+        AppHandler.require_remote_user(req)
         if req.path.startswith(Cfg.loadsigproxyclient_path):
             return self._loadsigproxyclient(req)
+        elif req.path == Cfg.getmycsrftoken_path:  # for unit test
+                csrf_token = CsrfToken.create_token(req.headers['REMOTE_USER'])
+                response = Response(csrf_token)
+                response.headers['content-type'] = 'text/plain'
+                response.headers['Cache-Control'] = 'no-cache'
+                return response
         else:
             raise NotFound
+
+    @staticmethod
+    def require_remote_user(req):
+        if not 'REMOTE_USER' in req.headers:
+            raise InvalidArgs('missing HTTP request header "REMOTE_USER"')
 
     def _loadsigproxyclient(self, req: Request) -> Response:
         sigproxyclient_html = self._render_sigproxyclient_html(req)
@@ -59,8 +75,8 @@ class AppHandler:
         js_params = {
             'getsignedxmldoc_url': Cfg.ext_origin + Cfg.getsignedxmldoc_url,
             'make_cresigrequ_url': Cfg.ext_origin + Cfg.make_cresigrequ_url,
-            'sigservice_url': config.SigServiceConfig.url,
-            'csrftoken4proxy': CsrfToken.create_token(),
+            'sigservice_url': seclay_xmlsig_proxy_config.SigServiceConfig.url,
+            'csrftoken4proxy': CsrfToken.create_token(req.headers['REMOTE_USER']),
             **urlparams_sane,
         }
         with Cfg.sig_proxy_js_template.open('r') as fd:
@@ -73,7 +89,7 @@ class AppHandler:
         mandatoryparams = set(Cfg.mandatoryparamtypes.keys())
         if 'sigtype' not in urlparams:
             urlparams['sigtype'] = Cfg.SIGTYPE_SAMLED
-        if len(set(urlparams.keys()).difference(mandatoryparams)) > 0:
+        if len(set(mandatoryparams).difference(urlparams.keys())) > 0:
             raise InvalidArgs(f"URL parameters must be these: {mandatoryparams}."
                               f" {set(urlparams.keys()).difference(mandatoryparams)}?")
         if urlparams['sigtype'] not in Cfg.SIGTYPE_VALUES:
@@ -81,7 +97,7 @@ class AppHandler:
         urlparams_sane = {}
         valid_chars = "-_.:+/%s%s" % (string.ascii_letters, string.digits)   # restrictive charset
         for k, v1 in urlparams.items():
-            if not AppHandler.is_allowed_host(k, v1):
+            if Cfg.mandatoryparamtypes[k] == 'url' and not AppHandler.is_allowed_host(k, v1):
                 raise InvalidArgs(f"URL parameter {k} is not an allowed_host: {v1}")
             v2 = unicodedata.normalize('NFKD', v1)
             v3 = v2.encode('ascii', 'ignore').decode('ascii')
@@ -100,7 +116,7 @@ class AppHandler:
 
     # --- POST handler ---
     def do_POST(self, req: Request) -> Response:
-        self._validate_csrf(req)
+        AppHandler._validate_csrf(req)
         if req.path == Cfg.make_cresigrequ_url:
             return self._make_cresigrequ(req)
         elif req.path == Cfg.getsignedxmldoc_url:
@@ -108,11 +124,12 @@ class AppHandler:
         else:
             raise NotFound
 
-    def _validate_csrf(self, req):
+    @staticmethod
+    def _validate_csrf(req):
         try:
-            CsrfToken.validate_token(req.form['csrftoken4proxy'])
+            CsrfToken.validate_token(req.form['csrftoken4proxy'], req.headers['REMOTE_USER'])
         except KeyError:
-            raise Exception('Missing CSRF token in POST request')
+            raise MissingCsrfToken('Missing CSRF token in POST request')
         except ValueError as e:
             raise e
 
@@ -166,7 +183,7 @@ class AppHandler:
             except FileExistsError as e:
                 pass
             fp = Cfg.siglog_path / 'createxmlsigresponse.xml'
-            with (fp).open('w') as fd:
+            with fp.open('w') as fd:
                 fd.write(xml)
                 logging.debug('saved CreateXMLSignatureResponse in ' + str(fp))
 
@@ -211,24 +228,26 @@ class AppHandler:
             elif req.method == 'GET':
                 response = self.do_GET(req)
             else:
-                return MethodNotAllowed
-        except NotFound as e:
-            #return Response(str(e), status=404)
-            response = Response(status='404 ' + str(e))
+                response = Response(status='405 only GET and POST allowed')
+                logging.error('  status: {}'.format(response.status))
+        except BadRequest as e:
+            logging.error('  405: ' + str(e))
+            raise e
         except InvalidArgs as e:
             response = Response(status='422 ' + str(e))
-        except SeclayError as e:
-            response = Response(str(e))
-            response.status_code = 200
-            response.headers['content-type'] = 'application/json'
-            response.headers['Cache-Control'] = 'no-cache'
-        except BadRequest as e:
-            return e
+            logging.error('  status: {}'.format(response.status))
+        except MissingCsrfToken as e:
+            response = Response(status='400 ' + str(e))
+            logging.error('  status: {}'.format(response.status))
+        except NotFound as e:
+            response = Response(status='404 ' + str(e))
+            logging.info('  status: {}'.format(response.status))
         except Exception as e:
-            raise BadRequest(description=str(e))
+            response = Response(status='500 ' + str(e))
+            logging.error('  status: {}'.format(response.status))
+        else:
+            logging.info('  status: {}'.format(response.status))
         return response(environ, start_response)
-
-
 
 
 class StandaloneApplication(gunicorn.app.base.BaseApplication):
@@ -265,7 +284,7 @@ if __name__ == '__main__':
     try:
         application = AppHandler().application
         options = {
-            'bind': '%s:%s' % (Cfg.host, Cfg.port),
+            'bind': '{}:{}'.format(Cfg.host, Cfg.port),
             'workers': number_of_workers(),
             'timeout': 18000,
         }

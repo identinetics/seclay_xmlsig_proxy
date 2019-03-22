@@ -7,8 +7,11 @@ from urllib.parse import urlencode
 # Signature Service (Security Layer) address: https/3496 preferred, but requires client certificate installation
 class SigServiceConfig:
     host = '127.0.0.1'
-    port = 3495
-    scheme = 'http'
+    if 'SECLAYPORT' in os.environ:
+        port = int(os.environ['SECLAYPORT'])
+    else:
+        port = 3495
+    scheme = 'http' if port == 3495 else 'https'
     url = '{}://{}:{}/http-security-layer-request'.format(scheme, host, port)
 
 class SigProxyConfig:
@@ -30,6 +33,8 @@ class SigProxyConfig:
     loadsigproxyclient_path = f'{rootpath}/loadsigproxyclient'
     make_cresigrequ_url = f'{rootpath}/makecresigrequ'
     getsignedxmldoc_url = f'{rootpath}/getsignedxmldoc'
+    getmycsrftoken_path = f'{rootpath}/getmycsrftoken'
+
     sig_proxy_html_template = Path(__file__).parent / 'sig_proxy_client.html'
     sig_proxy_js_template = Path(__file__).parent / 'sig_proxy_client.js.template'
     SIGTYPE_ENVELOPING = 'enveloping'

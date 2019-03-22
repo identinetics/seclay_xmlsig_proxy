@@ -1,6 +1,6 @@
 import logging
 import re
-from config import SigProxyConfig as cfg
+from seclay_xmlsig_proxy_config import SigProxyConfig as cfg
 
 def _save_request_for_debug(xml: str) -> None:
     if getattr(cfg, 'siglog_path', False):

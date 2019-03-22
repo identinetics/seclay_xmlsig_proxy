@@ -5,7 +5,7 @@ import urllib
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from tests.config_extwebapp import ExtWebappConfig
-from config import SigProxyConfig
+from seclay_xmlsig_proxy_config import SigProxyConfig
 
 """ test commands
     curl http://localhost:8090/

@@ -1,6 +1,6 @@
-# Proxy Service to provide SecLayer XMl Signature
+= Proxy Service to provide SecLayer XMl Signature
 
-## Purpose
+== Purpose
 
 Request an XML infoset to be signed by a signing service not directly accessible from the client.
 The connection to the signing service is via front-channel, that is via the browser.
@@ -14,7 +14,7 @@ It provides good separation of concerns with a small set of signature args:
 The "enveloped SAML EntityDescriptor" provides an implicit signature location.
 
 
-## Flow
+== Flow
 
 See doc/sequence_diagram.png
 
@@ -27,7 +27,7 @@ and provides following arguments:
 * return (path to finally redirect the browser at the external web app)
 
 
-## Test setup:
+== Test setup:
 
 1. start sig_proxy.py
 2. start signature_service.py
@@ -35,7 +35,7 @@ and provides following arguments:
 4. Trigger the folw at the external webapp
 
 
-## Deployment
+== Deployment
 
 *Development*
 
@@ -43,16 +43,23 @@ and provides following arguments:
     
 *Production with wsgi server, e.g. Gunicorn*
 
-    gunicorn --config=guncicorn_config.py sig_proxy_server_wsgi
+    gunicorn wsgi:application --config=guncicorn_config.py
      
 The SigProxy server should be deployed with an TLS-terminating proxy.
 It can be proxied into the namespace of the external webapp; the root path can be rewritten, e.g.
 
 http://sigproxy/SigProxy/xxx  -> http://sigproxy/nonappnamespace/xxx
 
-## Security Considerations
+Environment settings:
 
-The external web application must allow callbacks from the signature proxy by setting an appropriate acces-control-allow-origin header.
+SECLAYPORT  (default 3495)
+CSRFSECRET must be 24 char cryptographic random ascii strings (`openssl rand -base64 16`)
+CSRFENCRYPTKEY must be 24 char cryptographic random ascii strings (`openssl rand -base64 16`)
+
+== Security Considerations
+
+If the service is not mapped into the same origin,
+the external web application must allow callbacks from the signature proxy by setting an appropriate acces-control-allow-origin header.
 
 The signature proxy must validate the urls in the input args. 
 A whilelist of allowed hosts must be configured in SigProxyConfig.allowed_urls.  
