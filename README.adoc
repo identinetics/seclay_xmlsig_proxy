@@ -26,6 +26,9 @@ and provides following arguments:
 * result_to  (path at the external web app to POST result to)
 * return (path to finally redirect the browser at the external web app)
 
+Note: The service requires the userid in the http header, using it for CSRF-protection.
+The name of the http header is configured in SigProxyconfig.userid_http_header, and defaults to REMOTE-USER.
+It is the responsibility of the external authentication infrastructure to provide this header.
 
 == Test setup:
 
@@ -62,4 +65,4 @@ If the service is not mapped into the same origin,
 the external web application must allow callbacks from the signature proxy by setting an appropriate acces-control-allow-origin header.
 
 The signature proxy must validate the urls in the input args. 
-A whilelist of allowed hosts must be configured in SigProxyConfig.allowed_urls.  
+A whitelist of allowed hosts must be configured in SigProxyConfig.allowed_urls.

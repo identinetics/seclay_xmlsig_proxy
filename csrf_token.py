@@ -26,31 +26,28 @@ class CsrfToken:
         token_encrypt_pickled: bytes = pickle.dumps([cipher.nonce, tag, ciphertext])
         # base32 avoids urlencoding issues with + and blank:
         csrf_token: str = base64.b32encode(token_encrypt_pickled).decode('ascii')
-        if 'DEBUG' in os.environ:
-            print('create: token_plain=' + token_plain.hex())
-            print('create: ciphertext=' + ciphertext.hex())
-            print('create: tag=' + tag.hex())
-            print('create: token_encrypt_pickled=' + token_encrypt_pickled.hex())
-            print('create: csrf_token=' + csrf_token)
+        logging.debug('create: csrf_token=' + csrf_token)
         return csrf_token
+
+        # debug code parked to improve readablilty
+        # logging.debug('create: token_plain=' + token_plain.hex())
+        # logging.debug('create: ciphertext=' + ciphertext.hex())
+        # logging.debug('create: tag=' + tag.hex())
+        # logging.debug('create: token_encrypt_pickled=' + token_encrypt_pickled.hex())
 
     @staticmethod
     def validate_token(csrf_token: str, userid_arg: str) -> None:
         logging.debug('validate: csrf_token=' + csrf_token)
         token_encrypt_pickled = base64.b32decode(csrf_token)
-        logging.debug('validate: token_encrypt_pickled=' + token_encrypt_pickled.hex())
         try:
             (nonce, tag, ciphertext) = pickle.loads(token_encrypt_pickled)
         except ValueError as e:
             raise e
-        logging.debug('validate: ciphertext=' + ciphertext.hex())
-        logging.debug('validate: tag=' + tag.hex())
         cipher = AES.new(SigProxyConfig.csrf_encrypt_key, AES.MODE_EAX, nonce)
         try:
             token_plain = cipher.decrypt_and_verify(ciphertext, tag)
         except ValueError as e:
             raise ValueError('Invalid CSRF token - decryption failed with ' + str(e))
-        logging.debug('validate: token_plain=' + token_plain.hex())
         (csrf_secret, userid_bytes, create_time_serialized) = token_plain.split(b'|')
         if csrf_secret != SigProxyConfig.csrf_secret:
             raise ValueError('Invalid CSRF token - decrypted secret does not match')
@@ -60,6 +57,12 @@ class CsrfToken:
         difference = (datetime.now() - create_time).total_seconds()
         if difference > SigProxyConfig.csrf_token_maxage:
             raise ValueError('CSRF token expired')
+
+        # debug code parked to improve readablilty
+        # logging.debug('validate: token_encrypt_pickled=' + token_encrypt_pickled.hex())
+        # logging.debug('validate: ciphertext=' + ciphertext.hex())
+        # logging.debug('validate: tag=' + tag.hex())
+        # logging.debug('validate: token_plain=' + token_plain.hex())
 
     @staticmethod
     def create_broken_token_invalid_secret(userid: str) -> str:
