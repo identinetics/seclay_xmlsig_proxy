@@ -27,7 +27,7 @@ and provides following arguments:
 * return (path to finally redirect the browser at the external web app)
 
 Note: The service requires the userid in the http header, using it for CSRF-protection.
-The name of the http header is configured in SigProxyconfig.userid_http_header, and defaults to REMOTE-USER.
+The name of the http header is configured in SigProxyconfig.userid_http_header, and defaults to REMOTE_USER.
 It is the responsibility of the external authentication infrastructure to provide this header.
 
 == Test setup:

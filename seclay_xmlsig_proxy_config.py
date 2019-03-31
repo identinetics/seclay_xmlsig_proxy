@@ -20,7 +20,7 @@ class SigProxyConfig:
     port = 8001
     # External origin as seen by the browser
     ext_origin = 'http://localhost:8080'    # using the external proxy address
-    userid_http_header = 'REMOTE-USER'
+    userid_http_header = 'REMOTE_USER'
     #
     # each url parameter containing a url must left-match allowed_urls ('*' to match any):
     allowed_urls = ['http://localhost:8080', ]
