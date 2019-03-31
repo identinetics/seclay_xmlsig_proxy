@@ -1,4 +1,4 @@
-from config import SigProxyConfig as cfg
+from seclay_xmlsig_proxy_config import SigProxyConfig as cfg
 
 # Parameter description: see https://github.com/benoitc/gunicorn/blob/master/examples/example_config.py
 
